@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { SetupNavigation } from "@/components/setup-navigation";
 import { setupSteps } from "@/features/setup-center/steps";
 import { configuredStepCount, setupStepStates } from "@/features/setup-center/progress";
+import { loadBrowserSelectedStep, storeBrowserSelectedStep, nextSelectedStep } from "@/features/setup-center/navigation";
 
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
 
@@ -35,6 +36,7 @@ function Status({ tone, children }) {
 export default function SetupCenterPage() {
   const [data, setData] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
+  const [stepRestored, setStepRestored] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [issue, setIssue] = useState("");
@@ -45,7 +47,7 @@ export default function SetupCenterPage() {
       const owner = await read("/api/local/owner");
       if (owner.paired !== true) {
         setData({ paired: false });
-        setIssue("Browser belum memiliki sesi pemilik yang aktif. Jalankan dashboard menggunakan npm start.");
+        setIssue("Browser belum memiliki sesi pemilik yang aktif. Jalankan localdesk dan selesaikan pairing dari tautan privat di terminal, lalu buka kembali Setup Center.");
         return;
       }
       const results = await Promise.allSettled([
@@ -76,6 +78,22 @@ export default function SetupCenterPage() {
     } finally { setBusy(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  // Resume only after the local owner session is authenticated. Persisted
+  // selection is a step ID, never a token, provider result or completion flag.
+  useEffect(() => {
+    if (data?.paired === true && !stepRestored) {
+      setActiveStep(loadBrowserSelectedStep());
+      setStepRestored(true);
+    } else if (data?.paired === false && stepRestored) {
+      setStepRestored(false);
+      setActiveStep(0);
+    }
+  }, [data?.paired, stepRestored]);
+
+  function selectStep(index) {
+    if (data?.paired !== true) return;
+    setActiveStep(storeBrowserSelectedStep(index));
+  }
 
   async function control(path, actionName, description) {
     if (busy || data?.paired !== true) return;
@@ -168,7 +186,7 @@ export default function SetupCenterPage() {
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
             <nav aria-label="Daftar langkah konfigurasi" className="space-y-2">
               {steps.map((step, i) => (
-                <button key={step.title} type="button" onClick={() => setActiveStep(i)}
+                <button key={step.title} type="button" onClick={() => selectStep(i)}
                   aria-current={activeStep === i ? "step" : undefined}
                   className={"flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left text-sm transition " +
                     (activeStep === i ? "border-sky-500 bg-sky-950/30" :
@@ -195,6 +213,7 @@ export default function SetupCenterPage() {
                 Tahap {activeStep + 1} / {steps.length}
               </p>
               <h3 className="text-lg font-semibold">{steps[activeStep].title}</h3>
+              <p className="text-xs text-slate-400">Posisi langkah disimpan di browser ini tanpa menyimpan token atau klaim penyelesaian. Setelah LocalDesk dinyalakan ulang, pairing akan membuka Dashboard terlebih dahulu; kembali ke Setup Center pada browser yang sama untuk melanjutkan langkah ini. Status konfigurasi selalu diperiksa ulang dari server.</p>
               <p className="text-sm text-slate-300">{steps[activeStep].description}</p>
               <p className="text-sm leading-6 text-slate-400">{steps[activeStep].guide}</p>
               {activeStep === 0 && (
@@ -219,12 +238,12 @@ export default function SetupCenterPage() {
               )}
               <div className="flex items-center justify-between border-t border-slate-700 pt-4">
                 <button type="button" disabled={activeStep === 0}
-                  onClick={() => setActiveStep(i => Math.max(0, i - 1))}
+                  onClick={() => selectStep(nextSelectedStep(activeStep, -1))}
                   className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-30">
                   Sebelumnya
                 </button>
                 <button type="button" disabled={activeStep === steps.length - 1}
-                  onClick={() => setActiveStep(i => Math.min(steps.length - 1, i + 1))}
+                  onClick={() => selectStep(nextSelectedStep(activeStep, 1))}
                   className="rounded-md border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800 disabled:opacity-30">
                   Selanjutnya
                 </button>

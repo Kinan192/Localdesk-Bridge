@@ -143,7 +143,9 @@ try {
       "[Local MCP Manager] Remote services are in manual mode.\n") +
     "[Local MCP Manager] If it does not open, use this private link within 2 minutes:\n" +
     url + "\n" +
-    "[Local MCP Manager] Do not share this link. It only authorizes this browser.\n\n",
+    "[Local MCP Manager] Do not share this link. It only authorizes this browser.\n" +
+    "[Local MCP Manager] After pairing, resume your saved wizard step at: " +
+    DASHBOARD_ORIGIN + "/setup-center\n\n",
   );
   await openBrowser(url);
 } catch (error) {

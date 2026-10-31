@@ -81,5 +81,7 @@ test("user-facing npm start uses auto-pair launcher and preserves development co
   assert.match(launcher, /managedGroupStillRunning\(\)/);
   assert.match(launcher, /signalOwnedTree\("SIGKILL"\)/);
   assert.match(launcher, /stopManagedDashboard\("SIGTERM"\)/);
+  assert.match(launcher, /After pairing, resume your saved wizard step at:/);
+  assert.match(launcher, /DASHBOARD_ORIGIN \+ "\/setup-center/);
   assert.doesNotMatch(launcher, /CLOUDFLARE_API_TOKEN/);
 });

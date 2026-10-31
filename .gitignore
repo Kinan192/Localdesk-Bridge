@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build & cache
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Legacy backups
+/apps/
+/packages/
+/reference-v4/

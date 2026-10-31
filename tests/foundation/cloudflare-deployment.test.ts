@@ -101,7 +101,7 @@ test("deployment metadata safe lock is released if no intent or resource was sav
 });
 
 test("Cloudflare Setup UI requires owner and separate explicit approval for Access and DNS", async () => {
-  const source = await fs.readFile(path.resolve("src/app/cloudflare-setup/page.js"), "utf8");
+  const source = await fs.readFile(path.resolve("src/features/setup-center/cloudflare-deployment-panel.js"), "utf8");
   assert.match(source, /\/api\/local\/owner/);
   assert.match(source, /\/api\/local\/cloudflare\/deployment/);
   assert.match(source, /"prepare"/);

@@ -7,8 +7,10 @@ test("Setup Center links all active first-run steps and shows honest service sta
   const steps = await fs.readFile("src/features/setup-center/steps.js", "utf8");
   assert.match(source, /import \{ setupSteps \}/);
   assert.match(source, /<CredentialVaultPanel credentialInfo=\{data\?\.credentials\}/);
+  assert.match(source, /<CloudflareDeploymentPanel embedded onNavigateStep=\{selectStep\}/);
+  assert.match(steps, /id: "cloudflare".*href: null/);
   assert.match(steps, /id: "credentials".*href: null/);
-  for (const page of ["/cloudflare-setup", "/cloudflare-config", "/oauth-settings"]) {
+  for (const page of ["/cloudflare-config", "/oauth-settings"]) {
     assert.ok(steps.includes(page), "Missing step: " + page);
   }
   for (const api of ["/api/local/owner", "/api/local/policy", "/api/local/cloudflare/deployment",

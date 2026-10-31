@@ -136,7 +136,7 @@ test("recovery refuses non-access-ready or recorded tunnel/DNS, even if lock is 
 
 test("UI and privileged route expose recover only after explicit owner request and consent", async () => {
   const route = await fs.readFile(path.resolve("src/app/api/local/cloudflare/deployment/route.ts"), "utf8");
-  const page = await fs.readFile(path.resolve("src/app/cloudflare-setup/page.js"), "utf8");
+  const page = await fs.readFile(path.resolve("src/features/setup-center/cloudflare-deployment-panel.js"), "utf8");
   assert.match(route, /await ensureOwnerRequest\(request, true\)/);
   assert.match(route, /provisioner\.recover\(body\)/);
   assert.match(page, /action: "recover", confirmed: true/);

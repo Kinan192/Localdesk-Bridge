@@ -73,7 +73,7 @@ test("owner-protected local draft GET never returns token and preflight saves on
 
 test("vault and setup UI share only the owner-protected draft; no browser secret persistence", async () => {
   const vault = await fs.readFile(path.resolve("src/app/credential-vault/page.js"), "utf8");
-  const setup = await fs.readFile(path.resolve("src/app/cloudflare-setup/page.js"), "utf8");
+  const setup = await fs.readFile(path.resolve("src/features/setup-center/cloudflare-deployment-panel.js"), "utf8");
   assert.match(vault, /\/setup-draft/);
   assert.match(vault, /draftSaved/);
   assert.match(vault, /Lanjut ke Cloudflare Setup/);

@@ -7,6 +7,7 @@ import { configuredStepCount, setupStepStates } from "@/features/setup-center/pr
 import { loadBrowserSelectedStep, storeBrowserSelectedStep, nextSelectedStep } from "@/features/setup-center/navigation";
 import { SystemCheckPanel, FolderAccessPanel } from "@/features/setup-center/system-folder-panels";
 import { CredentialVaultPanel } from "@/features/setup-center/credential-vault-panel";
+import { CloudflareDeploymentPanel } from "@/features/setup-center/cloudflare-deployment-panel";
 import { rootEnabledChange, rootRemoval } from "@/features/setup-center/folder-policy";
 
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
@@ -225,7 +226,9 @@ export default function SetupCenterPage() {
               {configuredSteps} dari {steps.length} tahap mempunyai indikator lokal · koneksi AI perlu uji terpisah
             </p>
           </div>
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+          <div className={activeStep === 3
+            ? "grid gap-3 lg:grid-cols-[minmax(180px,0.65fr)_minmax(0,2fr)]"
+            : "grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]"}>
             <nav aria-label="Daftar langkah konfigurasi" className="space-y-2">
               {steps.map((step, i) => (
                 <button key={step.title} type="button" onClick={() => selectStep(i)}
@@ -271,6 +274,10 @@ export default function SetupCenterPage() {
               {activeStep === 2 && (
                 <CredentialVaultPanel credentialInfo={data?.credentials} parentBusy={busy}
                   onRefresh={() => refresh()} />
+              )}
+              {activeStep === 3 && (
+                <CloudflareDeploymentPanel embedded onNavigateStep={selectStep}
+                  onDeploymentChange={() => refresh()} />
               )}
               {steps[activeStep].href && (
                 <a href={steps[activeStep].href}

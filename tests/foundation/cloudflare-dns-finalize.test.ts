@@ -246,7 +246,7 @@ test("unexpected filesystem error is classified by safe errno, never raw message
 
 test("DNS finalization endpoint requires owner approval and UI never retries Tunnel creation", async () => {
   const route = await fs.readFile(path.resolve("src/app/api/local/cloudflare/dns-finalize/route.ts"), "utf8");
-  const ui = await fs.readFile(path.resolve("src/app/cloudflare-setup/page.js"), "utf8");
+  const ui = await fs.readFile(path.resolve("src/features/setup-center/cloudflare-deployment-panel.js"), "utf8");
   assert.match(route, /ensureOwnerRequest\(request, true\)/);
   assert.match(route, /finalizeDns\(body\)/);
   assert.match(route, /checkDnsCompletion\(\)/);

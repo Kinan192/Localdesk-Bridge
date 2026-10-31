@@ -1,11 +1,11 @@
 # M2 Implementation Plan — One-Page Setup Wizard
 
 **Date:** 2026-10-31  
-**Status:** M2.1 ACCEPTED on user's Arch Linux (2026-10-31); M2.2–M2.7 are not yet implemented/accepted.  
+**Status:** M2.1–M2.4 ACCEPTED on Arch Linux; M2.5–M2.7 pending.  
 **M1 gate:** accepted on user's Arch Linux after global `localdesk` command, scoped shutdown, and 32/32 focused startup tests.  
 **Scope:** FR-04, FR-05, FR-06 and M2 portion of FR-10 in `docs/PRD-V1-RELEASE-REFACTOR.md`.
 
-## Current source inspection
+## Initial source inspection (historical baseline before M2.1)
 
 - `src/app/setup-center/page.js` currently shows 8 steps and a progress count, but required configuration forms are behind **links to other routes**. Back/Next only changes the displayed explainer panel, so the main requirement to configure entirely in one page is **NOT met**.
 - `src/features/setup-center/steps.js` defines the eight steps, but the `href` property makes external internal-page navigation necessary for most configuration tasks. Existing user guidance is useful for the new inline wizard.
@@ -71,7 +71,26 @@ The existing `/api/local/policy` contract handles POST/PATCH/DELETE through owne
 
 **Manual acceptance:** Start `localdesk`, visit Setup Center step 3. Verify accurate status for an existing draft and no token revealed. If you already have a valid saved keychain token, **do not rotate/revoke it solely to test**: safe status/view/refresh is sufficient. For an isolated test account/token, verify → select an active account → explicit consent → save, and optionally test rotate/revoke on that *isolated* credential. Validate step navigation clears unsaved input, that a failed verification cannot enable save, and the separate `/credential-vault` route still works.
 
-**After acceptance:** review staged paths excluding build output and secret files, commit/push M2.3 under owner's standing authorization. Continue M2.4 Access & Tunnel inline. **Permanent UX target (after M2):** setup wizard stays available for reconfiguration and recovery, but a configured user normally enters Dashboard instead of being forced through every setup step.
+**M2.3 acceptance:** 25/25 setup tests and full 173/173 automatic tests passed, production build PASS, browser screenshot confirmed read-only saved-keychain status without disclosing tokens and refreshed wizard step. Commit `2ec279e` pushed to main. No token rotation/revoke on production credentials.
+
+## M2.4 — Cloudflare Access & Tunnel inline (2026-10-31)
+
+**Status: M2.4 ACCEPTED on user's Arch Linux (2026-10-31), pending milestone Git commit/push.** Migrated the full existing owner-guarded Cloudflare deployment UI into reusable `src/features/setup-center/cloudflare-deployment-panel.js`. The Setup Center now renders that same component at step 4, with inline navigation to the credential, MCP, OAuth and service steps. The legacy `/cloudflare-setup` page is now a thin compatibility wrapper importing the exact same implementation, so there is no divergent copy of the protected Cloudflare workflow. Layout allows more width for this complex step.
+
+**Existing security boundaries unchanged:** requests use owner-protected `/api/local/cloudflare/deployment` and `/api/local/cloudflare/dns-finalize` APIs; read-only readiness and diagnostics first; separate explicit approval of Access + Managed OAuth, publish, DNS completion, and lock recovery; no automatic writes on mount or on navigation. Existing deployment phases are read back from server, and the not-started-only new provisioning controls remain disabled after resources exist. Recovery still refuses uncertain external state; no local lock deletion. Ingress targets only 127.0.0.1:8401; dashboard 3100 is never an ingress. The component displays a detailed read-only review of verified hostname/zone/token/DNS/Access and OAuth callbacks before the owner grants consent. A successful state mutation triggers Setup Center's parent status refresh.
+
+**Tests:** existing Cloudflare deployment/DNS/recovery/draft/config-import UI regressions now assert against the shared component rather than removed page-local duplication; `tests/foundation/setup-cloudflare.test.ts` ensures inline rendering, compatibility wrapper, existing owner+CSRF API guards, phase checks, separate consent, non-secret handling, step navigation, and required coverage. The new test is part of `test:setup` and full `test`. No Cloudflare production resource operations have been performed.
+
+**Host acceptance gate:**
+- `npm run test:setup && npm run audit:all` — check syntax, typechecks, foundation/unit tests, MCP smoke and production build.
+- Start `localdesk`, complete pairing and visit `/setup-center` step 4; ensure the page renders inside wizard with no standalone navigation needed; refresh preserves step selection.
+- On **existing deployed/active Cloudflare resources**, only inspect read-only resource status and phase. Verify new Access/Tunnel/DNS write controls are disabled, existing callbacks remain, and old `/cloudflare-setup` still opens. Do NOT click new deployment, publish, DNS finalization, recovery or rotate/revoke during manual acceptance.
+- If a truly isolated test Cloudflare account/zone is available, exercise check → owner-approved prepare → verified state → inspect → publish/complete DNS, only after reviewing the exact hostname and production safeguards. This is optional and not required to accept non-destructive UI integration. Distinguish simulated test results from real provider E2E.
+- Review staged paths, exclude `next-env.d.ts` and secrets, then commit/push only if all acceptance checks pass. Next M2.5 integrates MCP config and OAuth callbacks.
+
+**Acceptance evidence (2026-10-31):** User confirmed `npm run test:setup && npm run audit:all` succeeded. In a browser screenshot, step 4 shows the shared Access/Tunnel/DNS flow inline in Setup Center; existing deployment is `published`, existing Access/Tunnel details are shown, and create/publish controls are disabled for existing resources. User confirmed browser checks passed; no production Cloudflare mutation or isolated end-to-end provisioning was performed in this acceptance. Existing non-destructive status and continuity are accepted; Cloudflare actual creation/recovery remain guarded behind owner consent and regression-tested backend.
+
+**Page cleanup policy:** Preserve Dashboard and ongoing-use feature routes. Keep `/cloudflare-setup`, `/credential-vault`, `/cloudflare-config`, `/oauth-settings`, `/tunnel-control` as backward-compatible routes throughout M2. In M4, migrate remaining UI to shared typed feature components, ensure old links/tests and recovery workflows are covered, then remove or redirect redundant setup pages. Do not delete backend API or validation components just because wizard UI is complete.
 
 
 

@@ -77,7 +77,7 @@ test("Invalid Cloudflare organization response cannot smuggle Team Domain", asyn
 test("Import route and UI require owner and never accept token through browser", async () => {
   const route = await fs.readFile(path.resolve("src/app/api/local/cloudflare/import-preview/route.ts"), "utf8");
   const page = await fs.readFile(path.resolve("src/app/cloudflare-config/page.js"), "utf8");
-  const setup = await fs.readFile(path.resolve("src/app/cloudflare-setup/page.js"), "utf8");
+  const setup = await fs.readFile(path.resolve("src/features/setup-center/cloudflare-deployment-panel.js"), "utf8");
   assert.match(route, /ensureOwnerRequest\(request\)/);
   assert.match(route, /previewRemoteConfigFromDeployment\(\)/);
   assert.doesNotMatch(route, /export async function POST/);

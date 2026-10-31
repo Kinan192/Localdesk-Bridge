@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SetupNavigation } from "@/components/setup-navigation";
 import { setupSteps } from "@/features/setup-center/steps";
 import { configuredStepCount, setupStepStates } from "@/features/setup-center/progress";
 import { loadBrowserSelectedStep, storeBrowserSelectedStep, nextSelectedStep } from "@/features/setup-center/navigation";
+import { SystemCheckPanel, FolderAccessPanel } from "@/features/setup-center/system-folder-panels";
+import { rootEnabledChange, rootRemoval } from "@/features/setup-center/folder-policy";
 
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
 
@@ -15,6 +17,21 @@ async function read(path) {
     : "Status layanan tidak dapat diperiksa (HTTP " + response.status + ").");
   return response.json();
 }
+async function mutatePolicy(method, payload) {
+  const response = await fetch("/api/local/policy", {
+    method, credentials: "same-origin", cache: "no-store", headers,
+    body: JSON.stringify(payload),
+  });
+  const value = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(response.status === 401
+    ? "Sesi owner berakhir. Jalankan ulang localdesk untuk pairing."
+    : value.error || "Perubahan izin folder gagal (HTTP " + response.status + ").");
+  if (value.mode !== "read-only" || !value.policy || !Array.isArray(value.policy.roots)) {
+    throw new Error("Respons kebijakan tidak terverifikasi; status izin tidak diubah.");
+  }
+  return value;
+}
+
 async function action(path, name) {
   const response = await fetch(path, {
     method: "POST", credentials: "same-origin", cache: "no-store", headers,
@@ -37,6 +54,7 @@ export default function SetupCenterPage() {
   const [data, setData] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
   const [stepRestored, setStepRestored] = useState(false);
+  const policyMutationInFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [issue, setIssue] = useState("");
@@ -93,6 +111,29 @@ export default function SetupCenterPage() {
   function selectStep(index) {
     if (data?.paired !== true) return;
     setActiveStep(storeBrowserSelectedStep(index));
+  }
+
+  async function changeFolder(method, payload, description) {
+    if (busy || policyMutationInFlight.current || data?.paired !== true ||
+        data.policy?.mode !== "read-only" || !Array.isArray(data.policy?.policy?.roots)) return false;
+    policyMutationInFlight.current = true;
+    setBusy(true);
+    setIssue("");
+    setNotice("");
+    try {
+      const updated = await mutatePolicy(method, payload);
+      setData(current => current?.paired === true
+        ? { ...current, policy: updated }
+        : current);
+      setNotice(description + ". Kebijakan terbaru sudah tersimpan.");
+      return true;
+    } catch (error) {
+      setIssue(error instanceof Error ? error.message : "Izin folder belum dapat diverifikasi.");
+      return false;
+    } finally {
+      policyMutationInFlight.current = false;
+      setBusy(false);
+    }
   }
 
   async function control(path, actionName, description) {
@@ -217,15 +258,14 @@ export default function SetupCenterPage() {
               <p className="text-sm text-slate-300">{steps[activeStep].description}</p>
               <p className="text-sm leading-6 text-slate-400">{steps[activeStep].guide}</p>
               {activeStep === 0 && (
-                <div className="space-y-2 rounded-lg border border-slate-700 p-3 text-sm">
-                  <p>Node.js: <strong>{system?.nodeVersion || "Belum terdeteksi"}</strong></p>
-                  <p>Dependency: <strong>{system?.dependenciesReady ? "Terdeteksi" : "Perlu diperiksa"}</strong></p>
-                  <p>Cloudflared: <strong>{system?.cloudflaredPresent ? "Terdeteksi" : "Belum ditemukan pada PATH"}</strong></p>
-                  {Array.isArray(system?.missing) && system.missing.length > 0 && (
-                    <p className="break-words text-amber-200">Yang belum ditemukan: {system.missing.join(", ")}</p>
-                  )}
-                  <p className="text-xs text-slate-400">Pemeriksaan bersifat lokal; keberadaan binary belum membuktikan Tunnel terhubung.</p>
-                </div>
+                <SystemCheckPanel system={system} busy={busy} onRefresh={() => void refresh()} />
+              )}
+              {activeStep === 1 && (
+                <FolderAccessPanel policyResponse={data?.policy} busy={busy}
+                  onAdd={payload => changeFolder("POST", payload, "Folder diberi izin baca")}
+                  onToggle={(id, enabled) => changeFolder("PATCH", rootEnabledChange(id, enabled),
+                    enabled ? "Izin folder diaktifkan" : "Izin folder dinonaktifkan")}
+                  onRemove={id => changeFolder("DELETE", rootRemoval(id), "Izin folder dicabut")} />
               )}
               {steps[activeStep].href && (
                 <a href={steps[activeStep].href}

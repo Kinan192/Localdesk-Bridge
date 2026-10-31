@@ -22,6 +22,24 @@ test("Dashboard policy API service persists read-only roots and tool permissions
     assert.equal((await api.getPolicy()).roots.length, 1);
     const id = added.roots[0].id;
 
+    // M2.2 inline wizard uses the same backend. Client-side form checks must
+    // never bypass server-side root safety, overlap and read-only enforcement.
+    const nested = path.join(approved, "nested");
+    const hidden = path.join(state, ".hidden");
+    await fs.mkdir(nested);
+    await fs.mkdir(hidden);
+    await assert.rejects(api.addReadOnlyRoot({ label: "Duplicate", absolutePath: approved }), /already approved/);
+    await assert.rejects(api.addReadOnlyRoot({ label: "Nested", absolutePath: nested }), /Overlapping roots/);
+    await assert.rejects(api.addReadOnlyRoot({ label: "Hidden", absolutePath: hidden }), /Hidden\/system/);
+    await assert.rejects(api.addReadOnlyRoot({ label: "Relative", absolutePath: "relative/folder" }), /absolute/);
+    await assert.rejects(api.addReadOnlyRoot({ label: "Home", absolutePath: os.homedir() }), /Whole-home/);
+    if (process.platform !== "win32") {
+      const alias = path.join(state, "alias");
+      await fs.symlink(approved, alias, "dir");
+      await assert.rejects(api.addReadOnlyRoot({ label: "Symlink", absolutePath: alias }), /symlinks/);
+    }
+    assert.equal((await api.getPolicy()).roots.length, 1);
+
     const disabled = await api.setRootEnabled({ type: "root", id, enabled: false });
     assert.equal(disabled.roots[0].enabled, false);
 

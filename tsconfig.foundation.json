@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2022"
+    ],
+    "isolatedModules": true
+  },
+  "include": [
+    "src/server/contracts/**/*.ts",
+    "src/server/access/**/*.ts",
+    "src/server/files/**/*.ts",
+    "src/server/storage/**/*.ts",
+    "src/server/audit/**/*.ts",
+    "src/server/mcp/**/*.ts",
+    "tests/foundation/**/*.ts",
+    "tests/mcp/**/*.ts",
+    "src/server/http/localhost-policy.ts",
+    "src/server/setup/**/*.ts",
+    "src/server/onboarding/**/*.ts",
+    "src/server/cloudflare/**/*.ts",
+    "src/server/service/**/*.ts",
+    "src/server/owner/**/*.ts",
+    "src/server/credentials/**/*.ts",
+    "scripts/launch-dashboard.ts"
+  ]
+}
+
+
+
+
+
+
+

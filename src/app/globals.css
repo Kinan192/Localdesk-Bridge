@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+@import "../styles/shell.css";
+@import "../styles/overview.css";
+@import "../styles/features.css";
+@import "../styles/dialogs.css";
+@import "../styles/responsive.css";
+
+/* Tailwind v4 design tokens; legacy styles are phased out per component. */
+@theme {
+  --color-mint: #78f0c9;
+  --color-panel: #141e2b;
+  --color-muted: #8fa1b6;
+  --color-canvas: #0a0f16;
+}
+

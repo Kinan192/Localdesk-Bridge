@@ -1,0 +1,33 @@
+.modal-overlay { position: fixed; z-index: 150; inset: 0; display: grid; place-items: center; padding: 18px; background: #030810c7; backdrop-filter: blur(7px); }
+.modal-card { width: min(100%, 465px); max-height: min(92vh, 820px); overflow-y: auto; background: linear-gradient(160deg, #182438, #111a27); border: 1px solid #3b5066; border-radius: 16px; padding: 24px; box-shadow: 0 30px 100px #000a; }
+.modal-wide { width: min(100%, 750px); }
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; padding-bottom: 20px; border-bottom: 1px solid #324154; }
+.modal-head h2 { font-size: 21px; margin: 0 0 7px; letter-spacing: -.025em; }
+.modal-head p { font-size: 11px; color: #8ea6bf; margin: 0; line-height: 1.5; }
+.modal-form { display: flex; flex-direction: column; gap: 17px; padding-top: 19px; }
+.modal-form label { display: flex; flex-direction: column; gap: 8px; color: #c6d6e9; font-size: 11px; font-weight: 700; }
+.modal-form input, .modal-form select { width: 100%; min-height: 42px; border: 1px solid #3b5068; background: #101c2b; border-radius: 8px; padding: 11px 12px; font-size: 12px; color: #e7f1fa; }
+.modal-form input::placeholder { color: #6e839c; }
+.modal-info { display: flex; align-items: flex-start; gap: 9px; padding: 13px; background: #262741; border: 1px solid #474567; border-radius: 8px; color: #bab6dc; line-height: 1.6; font-size: 11px; }
+.modal-info > svg { flex-shrink: 0; margin-top: 1px; }
+.input-error { margin: 0; color: #ffadb7; font-size: 11px; }
+.modal-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.guide-mode { display: flex; gap: 9px; align-items: center; padding: 14px 0; color: #aac2de; font-size: 11px; flex-wrap: wrap; }
+.guide-mode .tag { margin-left: auto; }
+.guide-steps { display: grid; gap: 14px; margin: 7px 0 20px; }
+.guide-step { display: flex; align-items: flex-start; gap: 12px; }
+.guide-step p { margin: 3px 0 0; font-size: 12px; color: #afc0d5; line-height: 1.65; }
+.step-number { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; border: 1px solid #416458; border-radius: 8px; background: #204137; color: var(--mint); font-size: 11px; font-weight: 760; }
+.tour-progress { display: flex; gap: 6px; margin: 20px 0 22px; }
+.tour-progress span { height: 5px; flex: 1; border-radius: 100px; background: #314054; }
+.tour-progress span.tour-active { background: var(--mint); }
+.tour-page { padding: 6px 0 4px; }
+.tour-page .icon-bubble { width: 50px; height: 50px; }
+.tour-page h3 { font-size: 19px; margin: 18px 0 9px; }
+.tour-page p { font-size: 12px; color: #9db1c9; line-height: 1.7; margin: 0; }
+.compact-layout .main-view { gap: 15px; padding-top: 25px; }
+.compact-layout .panel { padding: 16px 18px; }
+.compact-layout .metric-card { padding: 15px; }
+.compact-layout .hero-panel { min-height: 235px; }
+.mobile-shade { display: none; }
+

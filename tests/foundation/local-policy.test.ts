@@ -1,0 +1,43 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+test("Dashboard policy API service persists read-only roots and tool permissions", async () => {
+  const state = await fs.mkdtemp(path.join(os.tmpdir(), "lmm-policy-test-"));
+  const approved = path.join(state, "approved");
+  await fs.mkdir(approved);
+  const previous = process.env.LOCAL_MCP_STATE_DIR;
+  process.env.LOCAL_MCP_STATE_DIR = state;
+  try {
+    const api = await import("../../src/server/http/local-policy.ts");
+    const start = await api.getPolicy();
+    assert.equal(start.roots.length, 0);
+    assert.equal(start.tools.read_file, true);
+
+    const added = await api.addReadOnlyRoot({ label: "Workspace", absolutePath: approved });
+    assert.equal(added.roots.length, 1);
+    assert.equal(added.roots[0].access, "read");
+    assert.equal((await api.getPolicy()).roots.length, 1);
+    const id = added.roots[0].id;
+
+    const disabled = await api.setRootEnabled({ type: "root", id, enabled: false });
+    assert.equal(disabled.roots[0].enabled, false);
+
+    const toolChanged = await api.setToolEnabled({ type: "tool", tool: "read_file", enabled: false });
+    assert.equal(toolChanged.tools.read_file, false);
+    await assert.rejects(
+      api.setToolEnabled({ type: "tool", tool: "write_file", enabled: true }),
+      /disabled|write/i,
+    );
+
+    const removed = await api.removeRoot({ id });
+    assert.equal(removed.roots.length, 0);
+    assert.equal((await api.getPolicy()).roots.length, 0);
+  } finally {
+    if (previous === undefined) delete process.env.LOCAL_MCP_STATE_DIR;
+    else process.env.LOCAL_MCP_STATE_DIR = previous;
+    await fs.rm(state, { force: true, recursive: true });
+  }
+});

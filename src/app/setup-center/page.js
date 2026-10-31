@@ -6,6 +6,7 @@ import { setupSteps } from "@/features/setup-center/steps";
 import { configuredStepCount, setupStepStates } from "@/features/setup-center/progress";
 import { loadBrowserSelectedStep, storeBrowserSelectedStep, nextSelectedStep } from "@/features/setup-center/navigation";
 import { SystemCheckPanel, FolderAccessPanel } from "@/features/setup-center/system-folder-panels";
+import { CredentialVaultPanel } from "@/features/setup-center/credential-vault-panel";
 import { rootEnabledChange, rootRemoval } from "@/features/setup-center/folder-policy";
 
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
@@ -266,6 +267,10 @@ export default function SetupCenterPage() {
                   onToggle={(id, enabled) => changeFolder("PATCH", rootEnabledChange(id, enabled),
                     enabled ? "Izin folder diaktifkan" : "Izin folder dinonaktifkan")}
                   onRemove={id => changeFolder("DELETE", rootRemoval(id), "Izin folder dicabut")} />
+              )}
+              {activeStep === 2 && (
+                <CredentialVaultPanel credentialInfo={data?.credentials} parentBusy={busy}
+                  onRefresh={() => refresh()} />
               )}
               {steps[activeStep].href && (
                 <a href={steps[activeStep].href}

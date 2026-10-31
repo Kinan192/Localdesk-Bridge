@@ -27,14 +27,26 @@ test("Dashboard policy API service persists read-only roots and tool permissions
 
     const toolChanged = await api.setToolEnabled({ type: "tool", tool: "read_file", enabled: false });
     assert.equal(toolChanged.tools.read_file, false);
+    for (const tool of ["create_directory", "write_file", "edit_file", "rename_file", "delete_file"]) {
+      await assert.rejects(
+        api.setToolEnabled({ type: "tool", tool, enabled: true }),
+        /disabled|write/i,
+      );
+    }
     await assert.rejects(
-      api.setToolEnabled({ type: "tool", tool: "write_file", enabled: true }),
-      /disabled|write/i,
+      api.addReadOnlyRoot({ label: "No implicit escalation", absolutePath: approved, access: "write" }),
+    );
+    await assert.rejects(
+      api.setRootEnabled({ type: "root", id, enabled: true, access: "write" }),
     );
 
     const removed = await api.removeRoot({ id });
     assert.equal(removed.roots.length, 0);
     assert.equal((await api.getPolicy()).roots.length, 0);
+    const remote = await fs.readFile("src/server/mcp/http.ts", "utf8");
+    for (const tool of ["create_directory", "write_file", "edit_file", "rename_file", "delete_file"]) {
+      assert.doesNotMatch(remote, new RegExp('server\\.registerTool\\("' + tool + '"'));
+    }
   } finally {
     if (previous === undefined) delete process.env.LOCAL_MCP_STATE_DIR;
     else process.env.LOCAL_MCP_STATE_DIR = previous;

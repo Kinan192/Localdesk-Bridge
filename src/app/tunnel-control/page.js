@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SetupNavigation } from "@/components/setup-navigation";
 
 const endpoint = "/api/local/tunnel";
 const actionHeaders = {
@@ -77,7 +78,8 @@ export default function TunnelControlPage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 px-5 py-12 text-slate-100">
-      <a href="/setup-center" className="text-sm text-sky-300 underline">Kembali ke Setup Center</a>
+      <SetupNavigation current="/tunnel-control" />
+      
       <h1 className="text-3xl font-semibold">Cloudflare Tunnel — Start / Stop</h1>
       <p className="text-sm leading-6 text-slate-300">
         Kelola konektor Tunnel milik Local MCP Manager tanpa menyalin token.

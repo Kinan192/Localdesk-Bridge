@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SetupNavigation } from "@/components/setup-navigation";
 
 const base = "/api/local/cloudflare";
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
@@ -195,8 +196,9 @@ export default function CredentialVaultPage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-7 px-5 py-12 text-slate-100">
+      <SetupNavigation current="/credential-vault" />
       <header className="space-y-3">
-        <a href="/setup-center" className="text-sm text-sky-300 underline underline-offset-4">Kembali ke Setup Center</a>
+        
         <h1 className="text-3xl font-semibold">Cloudflare Credential Vault</h1>
         <p className="text-sm text-slate-400">Setelah cek hostname berhasil, tombol <strong>Lanjut ke Cloudflare Setup</strong> muncul di bawah formulir. Data nonrahasia akan tersimpan otomatis.</p>
         <p className="text-sm leading-6 text-slate-300">

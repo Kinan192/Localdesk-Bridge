@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SetupNavigation } from "@/components/setup-navigation";
+import { setupSteps } from "@/features/setup-center/steps";
+import { configuredStepCount, setupStepStates } from "@/features/setup-center/progress";
 
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
 
@@ -20,13 +23,8 @@ async function action(path, name) {
   if (!response.ok) throw new Error(value.error || "Permintaan gagal (HTTP " + response.status + ").");
   return value;
 }
-const steps = [
-  { title: "File Access", description: "Pilih folder lokal yang boleh dibaca AI.", href: "/", label: "Kelola di File Access" },
-  { title: "Cloudflare Credential", description: "Verifikasi token dan simpan ke OS Keychain.", href: "/credential-vault", label: "Kelola credential" },
-  { title: "Access, OAuth & DNS", description: "Buat proteksi identitas dan satu hostname MCP.", href: "/cloudflare-setup", label: "Konfigurasi Cloudflare" },
-  { title: "Remote MCP Configuration", description: "Impor hostname, Access audience, dan pengaturan listener.", href: "/cloudflare-config", label: "Periksa konfigurasi" },
-  { title: "OAuth Client Callbacks", description: "Kelola callback ChatGPT dan Claude tanpa membuat Tunnel ulang.", href: "/oauth-settings", label: "Kelola redirect URL" },
-];
+const steps = setupSteps;
+
 function Status({ tone, children }) {
   return <span className={"rounded-full px-2.5 py-1 text-xs font-medium " +
     (tone === "ok" ? "bg-emerald-950 text-emerald-200" :
@@ -36,6 +34,7 @@ function Status({ tone, children }) {
 }
 export default function SetupCenterPage() {
   const [data, setData] = useState(null);
+  const [activeStep, setActiveStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [issue, setIssue] = useState("");
@@ -55,6 +54,8 @@ export default function SetupCenterPage() {
         read("/api/local/status"),
         read("/api/local/service"),
         read("/api/local/tunnel"),
+        read("/api/local/cloudflare/setup-draft"),
+        read("/api/local/onboarding"),
       ]);
       setData({
         paired: true,
@@ -63,6 +64,8 @@ export default function SetupCenterPage() {
         remote: results[2].status === "fulfilled" ? results[2].value : null,
         service: results[3].status === "fulfilled" ? results[3].value : null,
         tunnel: results[4].status === "fulfilled" ? results[4].value : null,
+        credentials: results[5].status === "fulfilled" ? results[5].value : null,
+        onboarding: results[6].status === "fulfilled" ? results[6].value : null,
       });
       if (results.some(x => x.status === "rejected")) {
         setIssue("Sebagian status belum tersedia. Periksa konfigurasi pada tahap terkait.");
@@ -76,6 +79,10 @@ export default function SetupCenterPage() {
 
   async function control(path, actionName, description) {
     if (busy || data?.paired !== true) return;
+    if (path === "/api/local/tunnel" && actionName === "start" &&
+        !window.confirm("Pastikan cloudflared untuk Tunnel ini belum dijalankan manual. Mulai proses Tunnel baru yang dikelola dashboard?")) {
+      return;
+    }
     setBusy(true);
     setNotice("");
     setIssue("");
@@ -93,10 +100,26 @@ export default function SetupCenterPage() {
   const phase = data?.deployment?.phase || "not-started";
   const mcp = data?.remote?.remoteHttp?.state === "listening-protected";
   const tunnel = data?.tunnel?.status?.state === "running";
+  const mcpConfigured = data?.service?.configReady === true;
+  const mcpManaged = data?.service?.status?.managed === true;
+  const tunnelManaged = data?.tunnel?.status?.managed === true;
   const url = data?.deployment?.hostname ? "https://" + data.deployment.hostname + "/mcp" : null;
+  const system = data?.onboarding?.system;
+  const systemReady = system?.dependenciesReady === true && system?.cloudflaredPresent === true;
+  const stepStates = setupStepStates({
+    systemReady,
+    approvedFolders: folderCount,
+    credentialAvailable: data?.credentials?.credentialAvailable === true,
+    deploymentPhase: phase,
+    mcpConfigured,
+    mcpProtected: mcp,
+    tunnelManagedRunning: tunnel,
+  });
+  const configuredSteps = configuredStepCount(stepStates);
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-5 text-slate-100 sm:p-8">
+      <SetupNavigation current="/setup-center" />
       <header className="space-y-2">
         <a href="/" className="text-sm text-sky-300 hover:underline">Dashboard</a>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -135,39 +158,95 @@ export default function SetupCenterPage() {
           </div>
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Langkah konfigurasi</h2>
-          {steps.map((step, i) => (
-            <div key={step.title} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-300">{i + 1}</span>
-                <div>
-                  <h3 className="font-medium">{step.title}</h3>
-                  <p className="mt-1 text-sm text-slate-400">{step.description}</p>
+        <section className="space-y-3" aria-label="Langkah setup">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold">Langkah konfigurasi</h2>
+            <p className="text-xs text-slate-400">
+              {configuredSteps} dari {steps.length} tahap mempunyai indikator lokal · koneksi AI perlu uji terpisah
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+            <nav aria-label="Daftar langkah konfigurasi" className="space-y-2">
+              {steps.map((step, i) => (
+                <button key={step.title} type="button" onClick={() => setActiveStep(i)}
+                  aria-current={activeStep === i ? "step" : undefined}
+                  className={"flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left text-sm transition " +
+                    (activeStep === i ? "border-sky-500 bg-sky-950/30" :
+                      "border-slate-700 bg-slate-900/30 hover:border-slate-500")}>
+                  <span className={"flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-semibold " +
+                    (activeStep === i ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300")}>
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{step.title}</span>
+                    <span className="mt-0.5 block text-xs text-slate-400">
+                      {stepStates[i] === "configured" ? "Konfigurasi lokal terdeteksi" :
+                        stepStates[i] === "review" ? "Perlu pemeriksaan" :
+                        stepStates[i] === "verify-in-client" ? "Uji dari aplikasi AI" :
+                        "Belum terkonfirmasi"}
+                    </span>
+                  </span>
+                  <span aria-hidden="true" className="text-slate-400">{activeStep === i ? "●" : "›"}</span>
+                </button>
+              ))}
+            </nav>
+            <div className="min-w-0 space-y-4 self-start rounded-xl border border-slate-700 bg-slate-900/40 p-5">
+              <p className="text-xs font-medium uppercase tracking-widest text-sky-300">
+                Tahap {activeStep + 1} / {steps.length}
+              </p>
+              <h3 className="text-lg font-semibold">{steps[activeStep].title}</h3>
+              <p className="text-sm text-slate-300">{steps[activeStep].description}</p>
+              <p className="text-sm leading-6 text-slate-400">{steps[activeStep].guide}</p>
+              {activeStep === 0 && (
+                <div className="space-y-2 rounded-lg border border-slate-700 p-3 text-sm">
+                  <p>Node.js: <strong>{system?.nodeVersion || "Belum terdeteksi"}</strong></p>
+                  <p>Dependency: <strong>{system?.dependenciesReady ? "Terdeteksi" : "Perlu diperiksa"}</strong></p>
+                  <p>Cloudflared: <strong>{system?.cloudflaredPresent ? "Terdeteksi" : "Belum ditemukan pada PATH"}</strong></p>
+                  {Array.isArray(system?.missing) && system.missing.length > 0 && (
+                    <p className="break-words text-amber-200">Yang belum ditemukan: {system.missing.join(", ")}</p>
+                  )}
+                  <p className="text-xs text-slate-400">Pemeriksaan bersifat lokal; keberadaan binary belum membuktikan Tunnel terhubung.</p>
                 </div>
+              )}
+              {steps[activeStep].href && (
+                <a href={steps[activeStep].href}
+                  className="inline-flex rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400">
+                  {steps[activeStep].label}
+                </a>
+              )}
+              {activeStep === steps.length - 1 && url && (
+                <p className="break-all rounded-lg bg-slate-950 p-3 font-mono text-xs text-slate-200">{url}</p>
+              )}
+              <div className="flex items-center justify-between border-t border-slate-700 pt-4">
+                <button type="button" disabled={activeStep === 0}
+                  onClick={() => setActiveStep(i => Math.max(0, i - 1))}
+                  className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-30">
+                  Sebelumnya
+                </button>
+                <button type="button" disabled={activeStep === steps.length - 1}
+                  onClick={() => setActiveStep(i => Math.min(steps.length - 1, i + 1))}
+                  className="rounded-md border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800 disabled:opacity-30">
+                  Selanjutnya
+                </button>
               </div>
-              <a href={step.href}
-                className="rounded-lg border border-sky-600 px-3 py-2 text-sm text-sky-200 hover:bg-slate-800">
-                {step.label}
-              </a>
             </div>
-          ))}
+          </div>
         </section>
         <section className="space-y-3 rounded-xl border border-slate-700 p-5">
           <h2 className="text-lg font-semibold">Jalankan layanan</h2>
           <p className="text-sm text-slate-400">Semua layanan tetap berjalan di perangkat ini. Pengaturan tidak mengekspose dashboard ke internet.</p>
           <div className="flex flex-wrap items-center gap-3">
             <Status tone={mcp ? "ok" : "warn"}>Remote MCP: {mcp ? "Protected listener" : "Belum aktif"}</Status>
-            <button type="button" disabled={busy} onClick={() => void control("/api/local/service", "start", "Permintaan start MCP dikirim")}
+            <button type="button" disabled={busy || mcp || !mcpConfigured} onClick={() => void control("/api/local/service", "start", "Permintaan start MCP dikirim")}
               className="rounded-lg border border-sky-600 px-3 py-2 text-sm text-sky-200 disabled:opacity-40">Start MCP</button>
-            <button type="button" disabled={busy} onClick={() => void control("/api/local/service", "stop", "Permintaan stop MCP dikirim")}
+            <button type="button" disabled={busy || !mcpManaged} onClick={() => void control("/api/local/service", "stop", "Permintaan stop MCP dikirim")}
               className="rounded-lg border border-slate-600 px-3 py-2 text-sm disabled:opacity-40">Stop MCP</button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Status tone={tunnel ? "ok" : "warn"}>Tunnel: {tunnel ? "Managed process active" : "Belum aktif/di luar kontrol dashboard"}</Status>
-            <button type="button" disabled={busy} onClick={() => void control("/api/local/tunnel", "start", "Permintaan start Tunnel dikirim")}
+            <button type="button" disabled={busy || !mcp || tunnel} onClick={() => void control("/api/local/tunnel", "start", "Permintaan start Tunnel dikirim")}
               className="rounded-lg border border-sky-600 px-3 py-2 text-sm text-sky-200 disabled:opacity-40">Start Tunnel</button>
-            <button type="button" disabled={busy} onClick={() => void control("/api/local/tunnel", "stop", "Permintaan stop Tunnel dikirim")}
+            <button type="button" disabled={busy || !tunnelManaged} onClick={() => void control("/api/local/tunnel", "stop", "Permintaan stop Tunnel dikirim")}
               className="rounded-lg border border-slate-600 px-3 py-2 text-sm disabled:opacity-40">Stop Tunnel</button>
           </div>
         </section>

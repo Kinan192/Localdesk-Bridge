@@ -23,6 +23,15 @@ const launcher = await read("scripts/launch-dashboard.ts");
 if (!launcher.includes('"127.0.0.1"') || !launcher.includes("createTicket()")) {
   issues.push("Dashboard launcher has no verified localhost / owner pairing flow.");
 }
+if (!launcher.includes("verifyLauncherReadyProof(") ||
+    !launcher.includes("X-Local-MCP-Launch-Challenge")) {
+  issues.push("Dashboard launcher does not verify its child listener before owner pairing.");
+}
+const ownerRoute = await read("src/app/api/local/owner/route.ts");
+if (!ownerRoute.includes("launcherReadyProof(") ||
+    !ownerRoute.includes("ensureLocalRequest(request)")) {
+  issues.push("Owner readiness endpoint must bind HMAC proof to localhost checks.");
+}
 const remote = await read("src/server/mcp/http.ts");
 if (!remote.includes('server.listen(config.port, "127.0.0.1"')) {
   issues.push("Remote MCP listener does not explicitly bind to loopback.");
@@ -33,6 +42,11 @@ if (!provision.includes('http://127.0.0.1:8401')) {
 }
 if (provision.includes('http://127.0.0.1:3100')) {
   issues.push("Never route Cloudflare Tunnel to admin dashboard port 3100.");
+}
+for (const writeTool of ["create_directory", "write_file", "edit_file", "rename_file", "delete_file"]) {
+  if (remote.includes('server.registerTool("' + writeTool + '"')) {
+    issues.push("Remote write tool registered before security gate: " + writeTool);
+  }
 }
 const contracts = await read("src/server/contracts/index.ts");
 if (!contracts.includes("create_directory: false, write_file: false")) {

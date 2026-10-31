@@ -24,11 +24,37 @@ npm start
 
 Alamat default dashboard adalah `http://127.0.0.1:3100`. `npm start` menggunakan launcher terpercaya untuk menjalankan Next.js, membuat **tiket autentikasi pemilik sementara**, lalu membuka browser lokal. Jika browser tidak terbuka, klik tautan localhost privat yang ditampilkan terminal dalam dua menit. Jangan membagikan tautan pairing itu. Sesi browser dapat berakhir setelah delapan jam, dan startup baru akan menyiapkan tiket baru. Tidak perlu menjalankan `owner:pair` secara terpisah.
 
+**Auto-start setelah pairing:** pada mode produksi `npm start`, jika deployment Cloudflare dan akses Keychain sudah dikonfigurasi dengan benar, aplikasi otomatis mencoba menghidupkan **Remote MCP HTTP** terlebih dahulu, lalu **Tunnel** setelah pairing pemilik berhasil. Ini tidak membuat Access/Tunnel/DNS baru dan tidak menjamin login klien sudah sukses. Status kegagalan dapat dilihat di dashboard; tombol Start tetap tersedia sebagai tindakan pemulihan. Untuk mematikan auto-start, jalankan `npm run start:manual` (contohnya jika ada replica cloudflared independen). `npm run dashboard:dev` tetap manual.
+
 **Developer only:** `npm run dashboard:dev` menjalankan launcher yang sama dengan Next.js development mode. `npm run dev` tanpa launcher tetap tersedia untuk debugging dan mungkin mengharuskan pairing manual; bukan alur pengguna umum.
 
 Jika `npm start` menolak karena build belum ada, jalankan `npm run build` lebih dahulu. Jika port 3100 sedang digunakan, hentikan instance lama sebelum memulai instance baru.
 
+**Siklus hidup proses:** bila MCP HTTP dan Cloudflare Tunnel dijalankan melalui tombol Start di dashboard, keduanya adalah proses yang dikelola dashboard dan ikut berhenti ketika `npm start` ditutup dengan `Ctrl+C`. Ini disengaja untuk mode start/stop manual dan bukan berarti resource Tunnel/Access di Cloudflare dihapus. Proses `cloudflared` yang dijalankan **secara independen** di terminal atau service lain tidak boleh dihentikan oleh dashboard. Untuk koneksi remote tetap online, dashboard dan layanan yang dikelolanya perlu tetap berjalan, atau gunakan instance independen yang dikonfigurasi terpisah.
+
+### Uji perintah global `localdesk` untuk pengembang (sementara)
+
+Fitur CLI awal sudah dibuat, tetapi **belum dipublikasikan ke npm**. Setelah instalasi source dan `npm run build`, hubungkan executable dari direktori project:
+
+```bash
+cd ~/Projects/local-mcp-manager
+chmod +x bin/localdesk.mjs
+mkdir -p "$HOME/.local"
+npm_config_prefix="$HOME/.local" npm link
+export PATH="$HOME/.local/bin:$PATH"
+cd ~
+localdesk --help
+localdesk --version
+localdesk
+```
+
+Sekarang `localdesk` menggunakan launcher yang sama dengan `npm start`, termasuk pairing dan auto-start layanan bila konfigurasinya siap. `localdesk --manual-services` menonaktifkan auto-start. Jika dashboard sudah aktif, perintah ini menolak startup kedua karena port 3100 terpakai, tanpa menghentikan proses yang lain. Tombol/menu Terminal UI ala 9Router belum dibuat; targetnya milestone M4. Jika muncul `EACCES` ke `/usr/lib/node_modules` di Arch Linux, jangan gunakan `sudo npm link`: pakai prefix pengguna seperti pada perintah di atas. Untuk melepas link pengembangan, gunakan `npm_config_prefix="$HOME/.local" npm unlink -g local-mcp-manager`. Jika membuka terminal baru dan `localdesk` tidak ditemukan, tambahkan `$HOME/.local/bin` ke `PATH` shell secara permanen.
+
+**Belum tersedia untuk pengguna umum:** `npm install -g localdesk` dari registry npm tanpa clone. Nama paket, build output, dependency produksi (termasuk runtime tsx dan Keychain native), izin executable, dan QA Windows/macOS/Linux harus divalidasi sebelum publikasi di M6.
+
 ## 3. Pusat penyiapan
+
+Langkah pertama memeriksa Node.js, dependency aplikasi dan keberadaan binary cloudflared (pemeriksaan lokal saja). Tahap berikutnya memilih folder yang akan disetujui, lalu credential Cloudflare, deployment Access & Tunnel, MCP settings, OAuth callbacks, layanan, dan koneksi kedua AI client. Indikator konfigurasi tidak berarti koneksi client telah diuji.
 
 Buka `http://127.0.0.1:3100/setup-center`. Halaman ini merangkum status, navigasi setup, serta Start/Stop Remote MCP dan Tunnel. Tahapan lengkap yang direncanakan masih dalam migrasi UX; halaman konfigurasi detail tetap ada selama masa transisi.
 

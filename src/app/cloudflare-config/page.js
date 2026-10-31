@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SetupNavigation } from "@/components/setup-navigation";
 
 const ownerHeaders = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
 
@@ -85,7 +86,8 @@ export default function CloudflareConfigImportPage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 px-5 py-12 text-slate-100">
-      <a href="/setup-center" className="text-sm text-sky-300 underline">Kembali ke Setup Center</a>
+      <SetupNavigation current="/cloudflare-config" />
+      
       <h1 className="text-3xl font-semibold">Import Cloudflare ke Remote MCP</h1>
       <p className="text-sm leading-6 text-slate-300">
         Menggunakan kembali hostname dan Access AUD yang sudah dibuat oleh Cloudflare Setup.

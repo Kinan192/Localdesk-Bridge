@@ -7,7 +7,7 @@ const SECURITY_HEADERS = {
 
 // Framework-independent cookie parsing for the foundation security layer.
 // Fail closed when the browser supplies duplicate owner cookies.
-function ownerSessionCookie(request: Request): string | undefined {
+export function ownerSessionCookie(request: Request): string | undefined {
   const cookies = request.headers.get("cookie");
   if (!cookies) return undefined;
   const matches = cookies.split(";").map(cookie => cookie.trim())

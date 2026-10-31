@@ -54,4 +54,6 @@
 - OWASP on race conditions: https://community.owasp.org/pages/vulnerabilities/race_conditions
 - Cloudflare Managed OAuth / RFC 8707: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/
 
+**Update implementation 2026-10-31:** Trusted launcher now challenges the actual 127.0.0.1:3100 process with an HMAC proof bound to a per-launch secret before creating a pairing ticket. The /api/local/owner route only exposes a proof, never the launcher secret. This improves resistance to port-squatting, but requires unit, integration and manual host verification. Setup Center now consumes the existing owner-only onboarding system check. Remote write remains disabled and is NOT approved.
+
 **Current verdict:** NOT READY TO PUBLISH. Existing read-only MCP may remain in use under its current restrictions, but expanded write permissions, installer release and production claims remain gated.

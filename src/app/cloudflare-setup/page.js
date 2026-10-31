@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SetupNavigation } from "@/components/setup-navigation";
 
 const path = "/api/local/cloudflare/deployment";
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
@@ -261,7 +262,8 @@ export default function CloudflareSetupPage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 px-5 py-12 text-slate-100">
-      <a href="/setup-center" className="text-sm text-sky-300 underline">Kembali ke Setup Center</a>
+      <SetupNavigation current="/cloudflare-setup" />
+      
       <h1 className="text-3xl font-semibold">Cloudflare Setup</h1>
       <p className="text-sm leading-6 text-slate-300">
         Setup dua tahap: 1) Access + pembatasan email + Managed OAuth; 2) Tunnel + DNS

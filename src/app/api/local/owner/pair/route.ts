@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureLocalRequest, readJsonSmall, respond } from "@/server/http/local-only";
 import { OWNER_COOKIE, OwnerPairingRepository, SESSION_TTL_MS } from "@/server/owner/index";
+import { scheduleAutoStartAfterOwnerPair } from "@/server/service/auto-start";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export async function POST(request: NextRequest) {
     response.cookies.set(OWNER_COOKIE, session, {
       httpOnly: true, sameSite: "strict", path: "/", maxAge: SESSION_TTL_MS / 1000,
     });
+    // Initiate only after successful one-use owner authorization.
+    scheduleAutoStartAfterOwnerPair();
     return response;
   } catch { return respond({ error: "Pairing could not be completed." }, 400); }
 }

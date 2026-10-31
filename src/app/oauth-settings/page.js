@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SetupNavigation } from "@/components/setup-navigation";
 
 const endpoint = "/api/local/cloudflare/oauth-redirects";
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
@@ -109,10 +110,9 @@ export default function OAuthSettingsPage() {
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6 text-slate-100">
+      <SetupNavigation current="/oauth-settings" />
       <div className="space-y-2">
-        <a className="text-sm text-sky-300 hover:underline" href="/setup-center">
-          Kembali ke Setup Center
-        </a>
+        
         <h1 className="text-2xl font-bold">Manage OAuth Redirect URLs</h1>
         <p className="text-sm text-slate-300">
           Kelola callback ChatGPT, Claude, atau client lain dari dashboard lokal.

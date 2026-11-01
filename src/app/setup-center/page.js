@@ -8,6 +8,8 @@ import { loadBrowserSelectedStep, storeBrowserSelectedStep, nextSelectedStep } f
 import { SystemCheckPanel, FolderAccessPanel } from "@/features/setup-center/system-folder-panels";
 import { CredentialVaultPanel } from "@/features/setup-center/credential-vault-panel";
 import { CloudflareDeploymentPanel } from "@/features/setup-center/cloudflare-deployment-panel";
+import { MCPSettingsPanel } from "@/features/setup-center/mcp-settings-panel";
+import { OAuthCallbacksPanel } from "@/features/setup-center/oauth-callbacks-panel";
 import { rootEnabledChange, rootRemoval } from "@/features/setup-center/folder-policy";
 
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
@@ -226,7 +228,7 @@ export default function SetupCenterPage() {
               {configuredSteps} dari {steps.length} tahap mempunyai indikator lokal · koneksi AI perlu uji terpisah
             </p>
           </div>
-          <div className={activeStep === 3
+          <div className={[3, 4, 5].includes(activeStep)
             ? "grid gap-3 lg:grid-cols-[minmax(180px,0.65fr)_minmax(0,2fr)]"
             : "grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]"}>
             <nav aria-label="Daftar langkah konfigurasi" className="space-y-2">
@@ -278,6 +280,13 @@ export default function SetupCenterPage() {
               {activeStep === 3 && (
                 <CloudflareDeploymentPanel embedded onNavigateStep={selectStep}
                   onDeploymentChange={() => refresh()} />
+              )}
+              {activeStep === 4 && (
+                <MCPSettingsPanel embedded onNavigateStep={selectStep}
+                  onConfigured={() => refresh()} />
+              )}
+              {activeStep === 5 && (
+                <OAuthCallbacksPanel embedded onChanged={() => refresh()} />
               )}
               {steps[activeStep].href && (
                 <a href={steps[activeStep].href}

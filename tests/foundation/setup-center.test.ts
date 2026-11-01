@@ -10,8 +10,11 @@ test("Setup Center links all active first-run steps and shows honest service sta
   assert.match(source, /<CloudflareDeploymentPanel embedded onNavigateStep=\{selectStep\}/);
   assert.match(steps, /id: "cloudflare".*href: null/);
   assert.match(steps, /id: "credentials".*href: null/);
-  for (const page of ["/cloudflare-config", "/oauth-settings"]) {
-    assert.ok(steps.includes(page), "Missing step: " + page);
+  for (const [stepId, component] of [
+    ["mcp", "MCPSettingsPanel"], ["oauth", "OAuthCallbacksPanel"],
+  ]) {
+    assert.match(steps, new RegExp('id: "' + stepId + '".*href: null'));
+    assert.ok(source.includes("<" + component), "Inline wizard missing: " + component);
   }
   for (const api of ["/api/local/owner", "/api/local/policy", "/api/local/cloudflare/deployment",
       "/api/local/service", "/api/local/tunnel", "/api/local/status",

@@ -1,4 +1,4 @@
-// Setup stays in one navigation flow; detailed forms remain separate while being refactored.
+// The primary onboarding path stays inline; legacy advanced routes are retained for compatibility.
 export const setupSteps = [
   { id: "system", title: "Pemeriksaan sistem", description: "Periksa Node.js, dependency aplikasi, dan binary Cloudflared sebelum membuat konfigurasi.", href: null, label: null,
     guide: "Pemeriksaan ini hanya membaca kondisi komputer, tanpa memasang aplikasi atau mengubah layanan. Jika dependency belum lengkap, jalankan npm install di folder project. Jika Cloudflared tidak ditemukan, instal cloudflared dari sumber resmi dan periksa PATH. Gunakan Perbarui status setelah memperbaiki prasyarat." },
@@ -12,8 +12,8 @@ export const setupSteps = [
     guide: "Impor konfigurasi dari deployment Cloudflare langsung di panel ini. Periksa hostname publik, Access AUD, dan team domain; jika team domain tidak ditemukan, masukkan dari Zero Trust. Penyimpanan membutuhkan aksi owner eksplisit dan tidak membuat resource Cloudflare. Listener lokal tetap 127.0.0.1:8401." },
   { id: "oauth", title: "OAuth callbacks", description: "Kelola ChatGPT dan Claude tanpa membuat Access baru.", href: null, label: null,
     guide: "Muat callback aktual langsung dari Cloudflare dalam panel ini. Tambahkan hanya URL callback resmi tiap klien, pertahankan URL lama yang masih dipakai, tinjau perubahan, setujui, lalu Simpan & Verifikasi. Jika operasi tidak pasti, periksa langsung di Cloudflare sebelum mencoba ulang." },
-  { id: "services", title: "MCP & Tunnel services", description: "Jalankan kedua proses lokal sebelum mencoba koneksi.", href: "/tunnel-control", label: "Detail Tunnel",
-    guide: "Start Remote MCP lebih dahulu, kemudian start Tunnel. Jika Tunnel telah dijalankan secara manual, hindari memulai salinan proses kedua. Status proses lokal belum membuktikan autentikasi AI berhasil." },
+  { id: "services", title: "MCP & Tunnel services", description: "Jalankan kedua proses lokal sebelum mencoba koneksi.", href: null, label: null,
+    guide: "Mulai Remote MCP terlebih dahulu, kemudian Tunnel melalui kontrol di panel ini. Proses lain, termasuk cloudflared Arch Local MCP V2, tidak dikendalikan LocalDesk. Periksa Cloudflare Healthy di Cloudflare Dashboard secara terpisah dari status proses lokal. Keduanya belum membuktikan OAuth klien berhasil." },
   { id: "clients", title: "ChatGPT & Claude", description: "Selesaikan OAuth dan verifikasi tools pada setiap klien.", href: null, label: null,
-    guide: "Pada ChatGPT tambahkan custom MCP menggunakan URL HTTPS yang ditampilkan. Pada Claude buka Customize → Connectors → Add custom connector, gunakan Sign in now, Register automatically (DCR), dan Streamable HTTP. Login ke Cloudflare Access dan jalankan list_roots dari masing-masing klien." },
+    guide: "Ikuti petunjuk yang tersedia pada panel ini untuk menghubungkan ChatGPT dan Claude menggunakan endpoint MCP HTTPS yang sama. Login ke Cloudflare Access dari masing-masing klien, lalu uji list_roots, list_files, dan read_file pada folder uji. Jangan menyimpulkan klien sudah terhubung hanya dari status Tunnel atau MCP lokal." },
 ];

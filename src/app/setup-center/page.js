@@ -10,6 +10,7 @@ import { CredentialVaultPanel } from "@/features/setup-center/credential-vault-p
 import { CloudflareDeploymentPanel } from "@/features/setup-center/cloudflare-deployment-panel";
 import { MCPSettingsPanel } from "@/features/setup-center/mcp-settings-panel";
 import { OAuthCallbacksPanel } from "@/features/setup-center/oauth-callbacks-panel";
+import { ServiceControlPanel, AIClientVerificationPanel } from "@/features/setup-center/service-client-panels";
 import { rootEnabledChange, rootRemoval } from "@/features/setup-center/folder-policy";
 
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
@@ -164,9 +165,6 @@ export default function SetupCenterPage() {
   const mcp = data?.remote?.remoteHttp?.state === "listening-protected";
   const tunnel = data?.tunnel?.status?.state === "running";
   const mcpConfigured = data?.service?.configReady === true;
-  const mcpManaged = data?.service?.status?.managed === true;
-  const tunnelManaged = data?.tunnel?.status?.managed === true;
-  const url = data?.deployment?.hostname ? "https://" + data.deployment.hostname + "/mcp" : null;
   const system = data?.onboarding?.system;
   const systemReady = system?.dependenciesReady === true && system?.cloudflaredPresent === true;
   const stepStates = setupStepStates({
@@ -288,14 +286,20 @@ export default function SetupCenterPage() {
               {activeStep === 5 && (
                 <OAuthCallbacksPanel embedded onChanged={() => refresh()} />
               )}
+              {activeStep === 6 && (
+                <ServiceControlPanel service={data?.service} tunnel={data?.tunnel}
+                  remote={data?.remote} deployment={data?.deployment} busy={busy}
+                  onControl={control} onRefresh={() => refresh()} />
+              )}
+              {activeStep === 7 && (
+                <AIClientVerificationPanel deployment={data?.deployment} remote={data?.remote}
+                  tunnel={data?.tunnel} busy={busy} onRefresh={() => refresh()} />
+              )}
               {steps[activeStep].href && (
                 <a href={steps[activeStep].href}
                   className="inline-flex rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400">
                   {steps[activeStep].label}
                 </a>
-              )}
-              {activeStep === steps.length - 1 && url && (
-                <p className="break-all rounded-lg bg-slate-950 p-3 font-mono text-xs text-slate-200">{url}</p>
               )}
               <div className="flex items-center justify-between border-t border-slate-700 pt-4">
                 <button type="button" disabled={activeStep === 0}
@@ -311,34 +315,6 @@ export default function SetupCenterPage() {
               </div>
             </div>
           </div>
-        </section>
-        <section className="space-y-3 rounded-xl border border-slate-700 p-5">
-          <h2 className="text-lg font-semibold">Jalankan layanan</h2>
-          <p className="text-sm text-slate-400">Semua layanan tetap berjalan di perangkat ini. Pengaturan tidak mengekspose dashboard ke internet.</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Status tone={mcp ? "ok" : "warn"}>Remote MCP: {mcp ? "Protected listener" : "Belum aktif"}</Status>
-            <button type="button" disabled={busy || mcp || !mcpConfigured} onClick={() => void control("/api/local/service", "start", "Permintaan start MCP dikirim")}
-              className="rounded-lg border border-sky-600 px-3 py-2 text-sm text-sky-200 disabled:opacity-40">Start MCP</button>
-            <button type="button" disabled={busy || !mcpManaged} onClick={() => void control("/api/local/service", "stop", "Permintaan stop MCP dikirim")}
-              className="rounded-lg border border-slate-600 px-3 py-2 text-sm disabled:opacity-40">Stop MCP</button>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Status tone={tunnel ? "ok" : "warn"}>Tunnel: {tunnel ? "Managed process active" : "Belum aktif/di luar kontrol dashboard"}</Status>
-            <button type="button" disabled={busy || !mcp || tunnel} onClick={() => void control("/api/local/tunnel", "start", "Permintaan start Tunnel dikirim")}
-              className="rounded-lg border border-sky-600 px-3 py-2 text-sm text-sky-200 disabled:opacity-40">Start Tunnel</button>
-            <button type="button" disabled={busy || !tunnelManaged} onClick={() => void control("/api/local/tunnel", "stop", "Permintaan stop Tunnel dikirim")}
-              className="rounded-lg border border-slate-600 px-3 py-2 text-sm disabled:opacity-40">Stop Tunnel</button>
-          </div>
-        </section>
-        <section className="space-y-2 rounded-xl border border-slate-700 p-5">
-          <h2 className="text-lg font-semibold">Hubungkan AI Assistant</h2>
-          <p className="text-sm text-slate-400">Gunakan Server URL yang sama di ChatGPT dan Claude. Setiap client memiliki callback OAuth masing-masing.</p>
-          <p className="break-all rounded-lg bg-slate-950 p-3 font-mono text-sm">{url || "Hostname belum dipublikasikan"}</p>
-          <div className="flex flex-wrap gap-3">
-            <a href="https://chatgpt.com/" target="_blank" rel="noreferrer" className="rounded-lg border border-slate-600 px-3 py-2 text-sm">Buka ChatGPT</a>
-            <a href="https://claude.ai/" target="_blank" rel="noreferrer" className="rounded-lg border border-slate-600 px-3 py-2 text-sm">Buka Claude</a>
-          </div>
-          <p className="text-xs text-slate-400">Konektor belum diverifikasi hanya berdasarkan status proses lokal. Uji list_roots di masing-masing client.</p>
         </section>
       </>}
     </main>

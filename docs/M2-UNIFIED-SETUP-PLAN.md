@@ -1,7 +1,7 @@
 # M2 Implementation Plan — One-Page Setup Wizard
 
 **Date:** 2026-10-31  
-**Status:** M2.1–M2.4 ACCEPTED on Arch Linux; M2.5–M2.7 pending.  
+**Status:** M2.1–M2.6 ACCEPTED on Arch Linux; M2.7 integrated regression/release verification pending.  
 **M1 gate:** accepted on user's Arch Linux after global `localdesk` command, scoped shutdown, and 32/32 focused startup tests.  
 **Scope:** FR-04, FR-05, FR-06 and M2 portion of FR-10 in `docs/PRD-V1-RELEASE-REFACTOR.md`.
 
@@ -106,7 +106,23 @@ The existing `/api/local/policy` contract handles POST/PATCH/DELETE through owne
 
 **M2.5 final acceptance (2026-11-01):** After correcting the outdated negative regex, the owner confirmed `npm run test:setup && npm run audit:all` passed completely. Browser screenshots confirmed Setup Center step 5 loads saved hostname, Access audience, Team Domain and MCP port, while step 6 reads the exact two existing ChatGPT/Claude OAuth callback URLs from Cloudflare without issuing a PUT. Standalone `/cloudflare-config` and `/oauth-settings` were both verified to display their matching saved configuration/callback data; the initially blank OAuth page was captured while its read-only GET was still pending and subsequently loaded. No production Cloudflare resources or callback lists were modified. Full M2.5 accepted; isolated provider-write E2E was intentionally not performed.
 
-**After M2.5:** M2.6 supervised service states and client verification; M2.7 full integrated QA. Keep existing Cloudflare resources and independent Arch Local MCP V2 tunnel untouched.
+## M2.6 — Inline supervised services & AI client verification (2026-11-01)
+
+**Status: M2.6 ACCEPTED on user's Arch Linux (2026-11-01).** Full focused setup tests and `npm run audit:all` were reported PASS by owner; browser visual QA PASS. No live provider mutation or client-auth E2E was claimed. Step 7 now embeds `ServiceControlPanel` in `src/features/setup-center/service-client-panels.js` directly; step 8 embeds `AIClientVerificationPanel`. The old duplicate service-control and client-connect blocks at the bottom of Setup Center were removed. The standalone `/tunnel-control` advanced page is retained for backward compatibility through M4.
+
+**Strict status separation:** `serviceFacts` interprets owner-protected GET responses from `/api/local/service`, `/api/local/tunnel`, and `/api/local/status`. An HTTP 401 from the local MCP listener is described as **local protected-listener evidence only**, never external authentication. A managed cloudflared process is described as **local process state only**; Cloudflare Healthy and DNS must be verified in Cloudflare separately. OAuth and actual ChatGPT/Claude tool calls stay **not verified** until separately tested inside each AI application; do not infer success from published state or uptime. A public MCP URL is generated only from an already-published hostname with a safe format.
+
+**Process safety:** Continue using the exact owner+CSRF-protected server Start/Stop actions; no additional remote mutation endpoints were added. Start MCP requires saved config plus a known stopped/unmanaged state. Start Tunnel requires a protected local listener and a known stopped/unmanaged Tunnel. Stop controls only owned managed children and are disabled for manual/unknown replicas or transitions. Starting a Tunnel still shows a confirmation about manual replicas. No start/stop, Cloudflare writes, or probe calls are performed when the wizard panel merely renders.
+
+**Tests:** added `tests/foundation/setup-services-clients.test.ts` covering first-run unknown states, guarded Start/Stop rules, manual replicas, confirmed local protected-listener semantics, public HTTPS URL validation, owner-guarded API contracts, no secret persistence and separate client verification language. Updated `tests/foundation/setup-center.test.ts` to match the inline panels and updated `npm run test`/`npm run test:setup` to include the M2.6 suite.
+
+**Browser QA evidence (2026-11-01):** Owner screenshots showed step 7 with both MCP and Tunnel managed processes in `running` state, MCP protected listener HTTP 401 on port 8401, deployment `published`, Start buttons disabled and Stop enabled only for owned children. Step 8 displayed the HTTPS MCP URL, copy action, ChatGPT/Claude links, tool call instructions, and explicitly unverified external Healthy/OAuth status. No process was stopped or restarted and no provider resources were changed during QA. **Owner confirmed (2026-11-01):** `npm run test:setup && npm run audit:all` passed without failures. Browser screenshot verified step 7 and step 8. Legacy `/tunnel-control` source route and tests are unchanged and retained; explicit browser regression on that route is deferred to M2.7. Client E2E verification in ChatGPT and Claude is a separate external acceptance gate, not implied by process status.
+
+**Host acceptance required:** `npm run test:setup && npm run audit:all` must pass. After stopping the previous LocalDesk process and launching `localdesk` again, verify that step 7 displays MCP and Tunnel data correctly and the button states reflect actual managed/unmanaged status. **Do not stop active processes or click Start merely for testing**; the current Tunnel may be running through a different supervisor. Verify step 8 shows the previously published `https://<hostname>/mcp` URL, has accessible client links, and explicitly shows Cloudflare Healthy and OAuth/AI tool connectivity as *not independently verified*. Verify refresh and compatibility page `/tunnel-control` remain usable. Client connector E2E requires a tool call performed in ChatGPT and Claude separately, and is not claimed by this milestone.
+
+**Release gating:** Do not stage `next-env.d.ts`, credentials, tokens, or private state. After successful automated/browser acceptance, commit/push M2.6 under standing owner authorization; next run M2.7 integrated QA. Keep the independent Arch Local MCP V2 server and Cloudflare Tunnel untouched.
+
+
 
 **Page cleanup policy:** Preserve Dashboard and ongoing-use feature routes. Keep `/cloudflare-setup`, `/credential-vault`, `/cloudflare-config`, `/oauth-settings`, `/tunnel-control` as backward-compatible routes throughout M2. In M4, migrate remaining UI to shared typed feature components, ensure old links/tests and recovery workflows are covered, then remove or redirect redundant setup pages. Do not delete backend API or validation components just because wizard UI is complete.
 

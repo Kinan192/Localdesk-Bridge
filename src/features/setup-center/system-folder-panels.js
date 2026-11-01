@@ -96,6 +96,11 @@ export function FolderAccessPanel({ policyResponse, busy, onAdd, onToggle, onRem
       <p className="text-sm text-slate-300">
         Pilih hanya folder yang diperlukan. Izin saat ini <strong>Read Only</strong>; Read &amp; Write belum tersedia dan tidak dapat diaktifkan dari wizard.
       </p>
+      {policyResponse?.writeRelease?.available === false && (
+        <p role="status" className="rounded-lg border border-slate-700 p-3 text-xs leading-5 text-amber-200">
+          Mode Write masih dikunci oleh pemeriksaan keamanan M3. Perlindungan filesystem, otorisasi per klien, konfirmasi penghapusan, dan pengujian lintas platform harus selesai sebelum Write dapat diaktifkan.
+        </p>
+      )}
 
       <div className={rowClass}>
         <h4 className="font-medium">Folder yang telah disetujui</h4>

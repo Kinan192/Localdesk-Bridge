@@ -39,3 +39,5 @@ The current `FileEngine.resolve()` validates paths before ordinary pathname-base
 - Gate E: staged opt-in release, with Write default OFF; never migrate old read-only roots to Write.
 
 Until all gates pass, keep all remote mutations unregistered and **do not offer an enabled Write dropdown**. This document authorizes no permission escalation.
+
+**M3.1 progress (2026-11-01):** A read-only diagnostic `writeReleaseStatus()` was added to the owner-protected policy API and Setup Center, with fixed blockers and no permission grant or remote tool registration. Owner-provided focused tests (4/4), foundation tests (197/197), MCP smoke (3/3), static audit (155 files), typechecks and production build all PASS. Manual UI status review is still pending. This does **not** resolve parent-directory TOCTOU or authorize remote mutations. See `docs/M3-SECURE-WRITE-PLAN.md`.

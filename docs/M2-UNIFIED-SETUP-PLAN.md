@@ -124,6 +124,14 @@ The existing `/api/local/policy` contract handles POST/PATCH/DELETE through owne
 
 
 
+## M2.7 — Integrated QA implementation (2026-11-01)
+
+**Status: automated integrated QA PASS (owner host logs, 2026-11-01); full M2.7 interactive browser/mobile and external client verification PENDING.** Added `tests/foundation/setup-integrated.test.ts` with cross-feature scenarios for all eight wizard steps, local completion versus external OAuth/tool verification, returning-owner safe resume, owner/CSRF-protected mutations, failure/unknown status handling, sensitive-token non-persistence, old route compatibility, and keyboard/mobile static checks. `test:integrated` is available, and the integrated suite is included in both `test:setup` and the existing `audit:all` via the full test runner.
+
+Hardened `publicMcpUrl` so the copyable URL rejects malformed DNS labels, IP-like endpoints, .local and injected suffixes. Extended M2.6 tests accordingly. No Cloudflare resources, working LocalDesk services, or independent Arch Local MCP V2 were altered. The explicit evidence matrix and release acceptance checklist are in `docs/M2-INTEGRATED-QA.md`.
+
+**Host automated acceptance PASSED (2026-11-01):** owner ran `npm run test:integrated && npm run test:setup && npm run audit:all`; integrated 8/8, setup 48/48, foundation 193/193, MCP smoke 3/3; static 153 files, TypeScript/foundation typechecks, and optimized Next.js build all PASS. **Next browser QA:** verify narrow/keyboard behavior and each of the eight panels, recovery after refresh and restart, plus the `/tunnel-control` legacy route. For external authentication, verify ChatGPT and Claude tool calls separately, not via local status. Do not change live Cloudflare resources or stop working processes only for QA. Do not claim full M2 release acceptance until outstanding interactive browser and external-client gates are verified. The audited source/test slice may be pushed with these remaining gates explicitly documented; it is not an external-client release certification.
+
 **Page cleanup policy:** Preserve Dashboard and ongoing-use feature routes. Keep `/cloudflare-setup`, `/credential-vault`, `/cloudflare-config`, `/oauth-settings`, `/tunnel-control` as backward-compatible routes throughout M2. In M4, migrate remaining UI to shared typed feature components, ensure old links/tests and recovery workflows are covered, then remove or redirect redundant setup pages. Do not delete backend API or validation components just because wizard UI is complete.
 
 

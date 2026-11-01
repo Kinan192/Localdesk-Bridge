@@ -15,6 +15,13 @@ test("M2.6 public MCP URL comes only from published hostname, never localhost or
     { phase: "published", hostname: "localhost" }, { phase: "published", hostname: "mcp..example.com" },
     { phase: "published", hostname: "mcp.example.com/other" },
     { phase: "published", hostname: "mcp.example.com?token=private" },
+    { phase: "published", hostname: "127.0.0.1" },
+    { phase: "published", hostname: "mcp.local" },
+    { phase: "published", hostname: "-mcp.example.com" },
+    { phase: "published", hostname: "mcp-.example.com" },
+    { phase: "published", hostname: "mcp.example..com" },
+    { phase: "published", hostname: "mcp.example.com." },
+    { phase: "published", hostname: "mcp.example.com:8401" },
   ]) assert.equal(publicMcpUrl(value), null);
 });
 

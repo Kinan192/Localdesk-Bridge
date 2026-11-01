@@ -65,7 +65,7 @@ Buka `http://127.0.0.1:3100/setup-center`. Tahap **Pemeriksaan sistem** kini men
 5. **OAuth Redirect URLs:** pada langkah OAuth callbacks di Setup Center, muat URL callback saat ini dari Cloudflare. Tambahkan hanya callback ChatGPT/Claude yang resmi dan masih digunakan, jangan menghapus URL klien aktif. Perubahan hanya disimpan dengan consent dan verifikasi; jika hasil tidak pasti, tinjau di Cloudflare sebelum retry.
 6. **Layanan:** pada langkah MCP & Tunnel services, tinjau status listener terlindungi dan proses supervisi MCP/Tunnel, lalu jika diperlukan Start Remote MCP dan Start dedicated Tunnel. Jika MCP/Tunnel sudah berjalan, jangan klik Start lagi. Stop hanya mengendalikan proses LocalDesk sendiri; cloudflared manual/Arch Local MCP V2 tidak dikendalikan. Status Cloudflare Healthy harus diperiksa terpisah.
 7. **Clients:** pada langkah ChatGPT & Claude, gunakan URL MCP HTTPS yang sama hanya jika deployment published. Tambahkan konektor masing-masing klien dan lakukan login via Cloudflare Access menggunakan email yang diizinkan. Status running lokal dan Tunnel Healthy bukan bukti login OAuth atau pemanggilan tools berhasil.
-8. **Verify:** di setiap klien minta `list_roots`, lalu uji `list_files` dan `read_file` pada file uji dalam folder yang sudah disetujui.
+8. **Verify:** di setiap klien minta `list_roots`, lalu uji `list_files` dan `read_file` pada file uji dalam folder yang sudah disetujui. M2.7 menyediakan matriks uji regresi lengkap di `docs/M2-INTEGRATED-QA.md`; status proses atau 401 lokal bukan bukti kedua klien telah lolos pengujian E2E.
 
 ## 4. Cloudflare API Token: izin yang dibutuhkan
 

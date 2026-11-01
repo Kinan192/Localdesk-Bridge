@@ -8,10 +8,18 @@ export type PublicDeployment = { phase?: unknown; hostname?: unknown } | null | 
 
 export function publicMcpUrl(deployment: PublicDeployment): string | null {
   if (deployment?.phase !== "published" || typeof deployment.hostname !== "string") return null;
-  const host = deployment.hostname;
-  if (host.length > 253 || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/i.test(host) ||
-      !host.includes(".") || host.includes("..")) return null;
-  return "https://" + host.toLowerCase() + "/mcp";
+  const host = deployment.hostname.toLowerCase();
+  const labels = host.split(".");
+  // Public endpoints require a DNS hostname, never a loopback/IP literal,
+  // malformed label, URL scheme, or user-injected URL suffix.
+  if (host.length > 253 || labels.length < 2 ||
+      labels.some(label => label.length < 1 || label.length > 63 ||
+        !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) ||
+      /^\d+$/.test(labels[labels.length - 1]) ||
+      labels[labels.length - 1] === "local" || labels[labels.length - 1] === "localhost") {
+    return null;
+  }
+  return "https://" + host + "/mcp";
 }
 
 export type ServiceFacts = {

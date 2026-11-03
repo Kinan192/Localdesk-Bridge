@@ -23,7 +23,7 @@ delete (check as Record<string, unknown>).confirmed;
 const publish = { ...base, action: "publish" as const };
 
 function fixture(opts: { collide?: boolean; pending?: boolean; corruptOauth?: boolean; failAt?: string;
-  existingTunnel?: boolean; denyTunnelRead?: boolean } = {}) {
+  existingTunnel?: boolean; denyTunnelRead?: boolean; failAccessStatus?: number } = {}) {
   let current: DeploymentRecord | null = null;
   let locked = false;
   const calls: { method: string; path: string; body?: object }[] = [];
@@ -45,6 +45,7 @@ function fixture(opts: { collide?: boolean; pending?: boolean; corruptOauth?: bo
     assert.ok(route.startsWith("/accounts/" + accountId + "/") ||
       route.startsWith("/zones/" + zoneId + "/"));
     calls.push({ method, path: route, body });
+    if (opts.failAccessStatus && route.includes("/access/apps?")) throw new CloudflareApiError(opts.failAccessStatus);
     if (opts.failAt && route.includes(opts.failAt)) throw new CloudflareApiError(403);
     if (method === "GET" && route.includes("/access/apps?")) return opts.collide ? [{ domain: hostname }] : [];
     if (method === "GET" && route.includes("/cfd_tunnel?")) {
@@ -115,6 +116,26 @@ test("dashboard readiness check performs GET-only Cloudflare calls without chang
   assert.equal(f.calls.length, 1);
   assert.ok(f.calls.every(c => c.method === "GET"));
   assert.equal(JSON.stringify(result).includes(token), false);
+});
+
+test("readiness Access failures report safe HTTP status without leaking credentials", async () => {
+  const messages: Record<number, RegExp> = {
+    401: /Cloudflare HTTP 401.*Credential Vault/,
+    403: /Cloudflare HTTP 403.*Account Resources/,
+    400: /Cloudflare HTTP 400.*Account ID/,
+    404: /Cloudflare HTTP 404.*endpoint/,
+    429: /Cloudflare HTTP 429.*membatasi/,
+  };
+  for (const [code, pattern] of Object.entries(messages)) {
+    const f = fixture({ failAccessStatus: Number(code) });
+    await assert.rejects(() => f.p.checkSetup(check), (error: unknown) => {
+      assert.ok(error instanceof ProvisioningError);
+      assert.match(error.message, pattern);
+      assert.equal(error.message.includes(token), false);
+      return true;
+    });
+    assert.equal(f.state, null);
+  }
 });
 
 test("readiness check refuses unsafe input and Access collisions without writes", async () => {

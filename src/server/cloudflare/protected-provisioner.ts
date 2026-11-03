@@ -185,9 +185,21 @@ export class ProtectedCloudflareProvisioner {
     let applications: unknown;
     try {
       applications = await this.api("GET", "/accounts/" + accountId + "/access/apps?per_page=100&page=1", token);
-    } catch {
+    } catch (error) {
+      const status = error instanceof CloudflareApiError ? error.httpStatus : null;
+      const guidance = status === 401
+        ? "Autentikasi token ditolak. Periksa token tersimpan di Credential Vault."
+        : status === 403
+          ? "Akses ditolak. Periksa Account ID, Account Resources, dan izin Access: Apps and Policies."
+          : status === 400 || status === 404
+            ? "Periksa Account ID dan endpoint Access API yang digunakan."
+            : status === 429
+              ? "Cloudflare membatasi permintaan. Ulangi setelah beberapa saat."
+              : "Periksa koneksi, respons Cloudflare, dan credential tersimpan.";
       throw new ProvisioningError(
-        "Tidak dapat membaca Access apps. Periksa izin Access: Apps and Policies pada token Cloudflare.",
+        "Tidak dapat membaca Access apps" +
+        (status === null ? "" : " (Cloudflare HTTP " + status + ")") +
+        ". " + guidance,
       );
     }
     if (!Array.isArray(applications) || applications.length >= 100 ||

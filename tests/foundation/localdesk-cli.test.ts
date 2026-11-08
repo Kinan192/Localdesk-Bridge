@@ -23,7 +23,8 @@ test("localdesk global bin is declared, with a Node.js shebang and not published
   assert.equal(manifest.bin.localdesk, "./bin/localdesk.mjs");
   assert.equal(manifest.private, true, "Do not accidentally publish in M1");
   const source = await fs.readFile(bin, "utf8");
-  assert.ok(source.startsWith("#!/usr/bin/env node\n"));
+  // Git may check out CRLF on Windows; both LF and CRLF are valid here.
+  assert.match(source, /^#!\/usr\/bin\/env node\r?\n/);
 });
 
 test("localdesk --help works outside project root without starting or pairing", () => {

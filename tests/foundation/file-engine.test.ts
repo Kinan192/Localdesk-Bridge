@@ -52,7 +52,7 @@ test("Traversal, dot files, absolute paths, hardlinks and symlinks are blocked",
     await fs.mkdir(allowed); await fs.mkdir(outside);
     await fs.writeFile(path.join(outside, "secret.md"), "do-not-read");
     await fs.writeFile(path.join(allowed, ".env"), "SECRET=something");
-    await fs.symlink(outside, path.join(allowed, "jump"));
+    await fs.symlink(outside, path.join(allowed, "jump"), process.platform === "win32" ? "junction" : "dir");
     const p = defaultPolicy();
     p.roots = [{ id: "r", label: "Allowed", absolutePath: allowed, enabled: true, access: "write" }];
     p.tools.write_file = true;
@@ -71,4 +71,40 @@ test("Traversal, dot files, absolute paths, hardlinks and symlinks are blocked",
     await fs.link(path.join(outside, "secret.md"), hard);
     await assert.rejects(engine.readFile("r", "hard.md"), /hard-linked|single-linked/i);
   } finally { await fs.rm(temp, { recursive: true, force: true }); }
+});
+
+test("Windows approved Read Only folder supports nested directory browsing", {
+  skip: process.platform !== "win32",
+}, async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "lmm-win-read-"));
+  try {
+    const root = path.join(temp, "Approved Documents");
+    const nested = path.join(root, "Monthly Reports");
+    await fs.mkdir(nested, { recursive: true });
+    await fs.writeFile(path.join(nested, "summary.md"), "# Windows read smoke\n", "utf8");
+    await fs.writeFile(path.join(temp, "outside.md"), "outside", "utf8");
+
+    const config = defaultPolicy();
+    config.roots = [{
+      id: "windows_docs", label: "Windows Documents",
+      absolutePath: root.toUpperCase(), enabled: true, access: "read",
+    }];
+    const files = new FileEngine(await PolicyEngine.create(config));
+    assert.deepEqual(files.listRoots().map(item => item.id), ["windows_docs"]);
+    assert.ok((await files.listFiles("windows_docs")).entries.some(item =>
+      item.name === "Monthly Reports" && item.type === "folder"));
+    assert.ok((await files.listFiles("windows_docs", "Monthly Reports")).entries.some(item =>
+      item.name === "summary.md" && item.type === "file"));
+    assert.equal((await files.readFile("windows_docs", "Monthly Reports\\summary.md")).content,
+      "# Windows read smoke\n");
+    assert.equal((await files.fileInfo("windows_docs", "Monthly Reports")).type, "folder");
+    assert.ok((await files.searchFiles("windows_docs", "summary")).results.some(item =>
+      item.path.toLowerCase().endsWith("summary.md")));
+    await assert.rejects(files.listFiles("windows_docs", ".."));
+    await assert.rejects(files.listFiles("windows_docs", "C:\\Windows"));
+    await assert.rejects(files.readFile("windows_docs", "..\\outside.md"));
+    await assert.rejects(files.writeFile("windows_docs", "blocked.md", "denied"));
+  } finally {
+    await fs.rm(temp, { recursive: true, force: true });
+  }
 });

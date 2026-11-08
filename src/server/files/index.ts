@@ -12,6 +12,8 @@ const EXTENSIONS = new Set([
   ".txt", ".md", ".csv", ".json", ".js", ".jsx", ".mjs", ".cjs",
   ".ts", ".tsx", ".html", ".css", ".py", ".php", ".sql",
   ".yml", ".yaml", ".xml", ".sh", ".toml", ".ini", ".log",
+  ".astro", ".vue", ".svelte", ".go", ".rs", ".java", ".kt", ".swift",
+  ".cs", ".cpp", ".c", ".h", ".hpp", ".rb", ".dart", ".svg",
 ]);
 
 function partsOf(relative: string, allowRoot = false): string[] {
@@ -27,8 +29,8 @@ function partsOf(relative: string, allowRoot = false): string[] {
   if (!parts.length && !allowRoot) {
     throw new FoundationError("INVALID_INPUT", "A file/folder name is required.");
   }
-  for (const part of parts) {
-    if (part === ".." || part.startsWith(".") ||
+  for (const [i, part] of parts.entries()) {
+    if (part === ".." || (part.startsWith(".") && !(part === ".gitignore" && i === parts.length - 1)) ||
         part.includes(":") || /[<>|?*]/.test(part) ||
         /[. ]$/.test(part) ||
         /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i.test(part)) {
@@ -39,6 +41,8 @@ function partsOf(relative: string, allowRoot = false): string[] {
 }
 
 function ensureTextExtension(filePath: string) {
+  // A project may need .gitignore; other dotfiles remain blocked.
+  if (path.basename(filePath).toLowerCase() === ".gitignore") return;
   if (!EXTENSIONS.has(path.extname(filePath).toLowerCase())) {
     throw new FoundationError("ACCESS_DENIED", "File extension is not allowed for text operations.");
   }

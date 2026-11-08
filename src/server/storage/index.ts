@@ -43,7 +43,8 @@ export class JsonPolicyRepository implements PolicyRepository {
     if (!stat.isDirectory() || stat.isSymbolicLink()) {
       throw new Error("Local state directory must be a real directory.");
     }
-    await fs.chmod(this.directory, 0o700);
+    // NTFS access permissions are controlled by Windows ACLs, not POSIX chmod.
+    if (process.platform !== "win32") await fs.chmod(this.directory, 0o700);
   }
 
   async load(): Promise<Policy> {

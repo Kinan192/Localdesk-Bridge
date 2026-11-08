@@ -6,6 +6,20 @@
 export type NewReadRoot = { label: string; absolutePath: string };
 export type RootEnabledChange = { type: "root"; id: string; enabled: boolean };
 export type RootRemoval = { id: string };
+export type RootAccessChange = { type: "root"; id: string; access: "read" | "write" };
+
+export function rootAccessChange(id: string, access: "read" | "write"): RootAccessChange {
+  if (access !== "read" && access !== "write") throw new Error("Mode folder tidak valid.");
+  if (typeof id !== "string" || !id || id.length > 80) throw new Error("ID folder tidak valid.");
+  return { type: "root", id, access };
+}
+
+export function newFolderRoot(
+  label: string, absolutePath: string, access: "read" | "write",
+): NewReadRoot & { access: "read" | "write" } {
+  if (access !== "read" && access !== "write") throw new Error("Mode folder tidak valid.");
+  return { ...newReadRoot(label, absolutePath), access };
+}
 
 export function newReadRoot(label: string, absolutePath: string): NewReadRoot {
   if (typeof label !== "string" || typeof absolutePath !== "string") {

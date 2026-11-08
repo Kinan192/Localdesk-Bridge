@@ -7,6 +7,7 @@ import { toNodeHandler } from "@modelcontextprotocol/node";
 import { FoundationError, type ToolName } from "../contracts/index.ts";
 import { PolicyEngine } from "../access/index.ts";
 import { FileEngine } from "../files/index.ts";
+import { authorizedMutation, writeBackendAvailable, type WriteOperation } from "../files/secure-write.ts";
 import { JsonPolicyRepository } from "../storage/index.ts";
 import { appendAuditEvent } from "../audit/index.ts";
 import { createAccessVerifier } from "./access-auth.ts";
@@ -40,6 +41,13 @@ async function start() {
     // Reload on every call: revoking a folder/tool in the dashboard is
     // effective for the next request, without restarting the HTTP server.
     return new FileEngine(await PolicyEngine.create(await repository.load()));
+  }
+  async function writeOperation(rootId: string, intent: WriteOperation): Promise<unknown> {
+    // Policy is loaded afresh for every tool call, including revocations.
+    const policy = await PolicyEngine.create(await repository.load());
+    // guarded() records the actual outcome once. Logging "allowed" here
+    // would incorrectly claim success before policy and filesystem checks.
+    return authorizedMutation(policy, rootId, intent);
   }
   async function record(tool: ToolName, rootId: string | undefined, result: "allowed" | "denied" | "error") {
     try { await appendAuditEvent({ tool, rootId, result, clientId: "remote-http" }); }
@@ -93,6 +101,45 @@ async function start() {
       inputSchema: z.object({ rootId: z.string().min(1), item: z.string().min(1).max(500) }),
     }, async ({ rootId, item }) => guarded("file_info", rootId, async () =>
       (await tools()).fileInfo(rootId, item)));
+
+    // Write is never registered on an unsupported host. Authorization is
+    // checked for each operation against the latest owner-approved folder.
+    if (writeBackendAvailable()) {
+      server.registerTool("create_directory", {
+        description: "Create one directory inside a Read & Write approved root.",
+        inputSchema: z.object({ rootId: z.string().min(1), folder: z.string().min(1).max(500) }),
+      }, async ({ rootId, folder }) => guarded("create_directory", rootId,
+        () => writeOperation(rootId, { tool: "create_directory", path: folder })));
+
+      server.registerTool("write_file", {
+        description: "Create a new UTF-8 text file without overwriting.",
+        inputSchema: z.object({ rootId: z.string().min(1),
+          file: z.string().min(1).max(500), content: z.string().max(65536) }),
+      }, async ({ rootId, file, content }) => guarded("write_file", rootId,
+        () => writeOperation(rootId, { tool: "write_file", path: file, content })));
+
+      server.registerTool("edit_file", {
+        description: "Replace a text file if expected SHA-256 matches its current content.",
+        inputSchema: z.object({ rootId: z.string().min(1),
+          file: z.string().min(1).max(500), content: z.string().max(65536),
+          expectedSha256: z.string().regex(/^[a-f0-9]{64}$/) }),
+      }, async ({ rootId, file, content, expectedSha256 }) => guarded("edit_file", rootId,
+        () => writeOperation(rootId, { tool: "edit_file", path: file, content, expectedSha256 })));
+
+      server.registerTool("rename_file", {
+        description: "Rename an approved text file only when the destination does not exist.",
+        inputSchema: z.object({ rootId: z.string().min(1),
+          from: z.string().min(1).max(500), to: z.string().min(1).max(500) }),
+      }, async ({ rootId, from, to }) => guarded("rename_file", rootId,
+        () => writeOperation(rootId, { tool: "rename_file", path: from, destination: to })));
+
+      server.registerTool("delete_file", {
+        description: "Request local owner approval to delete one text file. Call again with the approved ID to execute.",
+        inputSchema: z.object({ rootId: z.string().min(1),
+          file: z.string().min(1).max(500), approvalId: z.string().uuid().optional() }),
+      }, async ({ rootId, file, approvalId }) => guarded("delete_file", rootId,
+        () => writeOperation(rootId, { tool: "delete_file", path: file, approval: approvalId })));
+    }
     return server;
   }, { responseMode: "json" });
 

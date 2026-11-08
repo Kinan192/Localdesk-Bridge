@@ -98,4 +98,10 @@
 .toast { position: fixed; z-index: 200; bottom: 24px; right: 24px; max-width: min(470px,calc(100vw - 30px)); display: flex; align-items: center; gap: 10px; padding: 14px 16px; border: 1px solid #417a64; border-radius: 11px; background: #19382f; box-shadow: 0 20px 45px #0008; color: #d2fff0; font-size: 12px; }
 .toast > svg { color: var(--mint); flex-shrink: 0; }
 .toast span { flex: 1; line-height: 1.5; }
-.toast button { display: grid; place-items: center; border: 0; background: none; color: #b0decc; padding: 4px; }
+.toast button { display: grid; place-items: center; border: 0; background: none; color: inherit; padding: 4px; cursor: pointer; }
+.toast-success { border-color: #417a64; background: #19382f; color: #d2fff0; }
+.toast-success > svg { color: #78f0c9; }
+.toast-warning { border-color: #9a721e; background: #3c2b15; color: #ffdf9f; }
+.toast-warning > svg { color: #fbbf24; }
+.toast-error { border-color: #a74551; background: #3f1b27; color: #ffd4d9; }
+.toast-error > svg { color: #fb7185; }

@@ -11,7 +11,7 @@ import { CloudflareDeploymentPanel } from "@/features/setup-center/cloudflare-de
 import { MCPSettingsPanel } from "@/features/setup-center/mcp-settings-panel";
 import { OAuthCallbacksPanel } from "@/features/setup-center/oauth-callbacks-panel";
 import { ServiceControlPanel, AIClientVerificationPanel } from "@/features/setup-center/service-client-panels";
-import { rootEnabledChange, rootRemoval } from "@/features/setup-center/folder-policy";
+import { rootEnabledChange, rootRemoval, rootAccessChange } from "@/features/setup-center/folder-policy";
 
 const headers = { "Content-Type": "application/json", "X-Local-MCP-Action": "dashboard" };
 
@@ -31,7 +31,7 @@ async function mutatePolicy(method, payload) {
   if (!response.ok) throw new Error(response.status === 401
     ? "Sesi owner berakhir. Jalankan ulang localdesk untuk pairing."
     : value.error || "Perubahan izin folder gagal (HTTP " + response.status + ").");
-  if (value.mode !== "read-only" || !value.policy || !Array.isArray(value.policy.roots)) {
+  if (!["read-only", "read-write"].includes(value.mode) || !value.policy || !Array.isArray(value.policy.roots)) {
     throw new Error("Respons kebijakan tidak terverifikasi; status izin tidak diubah.");
   }
   return value;
@@ -62,6 +62,7 @@ export default function SetupCenterPage() {
   const policyMutationInFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [noticeTone, setNoticeTone] = useState("success");
   const [issue, setIssue] = useState("");
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -81,6 +82,7 @@ export default function SetupCenterPage() {
         read("/api/local/tunnel"),
         read("/api/local/cloudflare/setup-draft"),
         read("/api/local/onboarding"),
+        read("/api/local/delete-approvals"),
       ]);
       setData({
         paired: true,
@@ -91,6 +93,7 @@ export default function SetupCenterPage() {
         tunnel: results[4].status === "fulfilled" ? results[4].value : null,
         credentials: results[5].status === "fulfilled" ? results[5].value : null,
         onboarding: results[6].status === "fulfilled" ? results[6].value : null,
+        deleteApprovals: results[7].status === "fulfilled" ? results[7].value : null,
       });
       if (results.some(x => x.status === "rejected")) {
         setIssue("Sebagian status belum tersedia. Periksa konfigurasi pada tahap terkait.");
@@ -120,7 +123,8 @@ export default function SetupCenterPage() {
 
   async function changeFolder(method, payload, description) {
     if (busy || policyMutationInFlight.current || data?.paired !== true ||
-        data.policy?.mode !== "read-only" || !Array.isArray(data.policy?.policy?.roots)) return false;
+        !["read-only", "read-write"].includes(data.policy?.mode) ||
+        !Array.isArray(data.policy?.policy?.roots)) return false;
     policyMutationInFlight.current = true;
     setBusy(true);
     setIssue("");
@@ -130,7 +134,13 @@ export default function SetupCenterPage() {
       setData(current => current?.paired === true
         ? { ...current, policy: updated }
         : current);
-      setNotice(description + ". Kebijakan terbaru sudah tersimpan.");
+      const removingAccess = method === "DELETE";
+      const reducingAccess = method === "PATCH" && payload?.type === "root" &&
+        (payload.enabled === false || payload.access === "read");
+      setNoticeTone(removingAccess ? "delete" : reducingAccess ? "warning" : "success");
+      setNotice(removingAccess
+        ? "Izin akses folder berhasil dicabut dari MCP. Folder beserta file aslinya tetap ada di disk."
+        : description + ".");
       return true;
     } catch (error) {
       setIssue(error instanceof Error ? error.message : "Izin folder belum dapat diverifikasi.");
@@ -138,6 +148,30 @@ export default function SetupCenterPage() {
     } finally {
       policyMutationInFlight.current = false;
       setBusy(false);
+    }
+  }
+
+  async function approvePendingDelete(id) {
+    if (busy || data?.paired !== true) return;
+    setBusy(true); setIssue(""); setNotice("");
+    let approved = false;
+    try {
+      const response = await fetch("/api/local/delete-approvals", {
+        method: "POST", credentials: "same-origin", cache: "no-store", headers,
+        body: JSON.stringify({ id }),
+      });
+      const value = await response.json().catch(() => ({}));
+      if (!response.ok || value.approved !== true) {
+        throw new Error(value.error || "Persetujuan hapus gagal.");
+      }
+      approved = true;
+      setNoticeTone("warning");
+      setNotice("Izin hapus satu file telah disetujui. File BELUM dihapus; AI harus mengulangi permintaan Delete sebelum izin kedaluwarsa.");
+    } catch (error) {
+      setIssue(error instanceof Error ? error.message : "Persetujuan gagal.");
+    } finally {
+      setBusy(false);
+      if (approved) void refresh();
     }
   }
 
@@ -150,14 +184,17 @@ export default function SetupCenterPage() {
     setBusy(true);
     setNotice("");
     setIssue("");
+    let changed = false;
     try {
       await action(path, actionName);
+      changed = true;
+      setNoticeTone(actionName === "stop" ? "warning" : "success");
       setNotice(description + ". Status akan diperiksa ulang.");
     } catch (error) {
       setIssue(error instanceof Error ? error.message : "Perubahan status belum dapat diverifikasi.");
     } finally {
       setBusy(false);
-      void refresh();
+      if (changed) void refresh();
     }
   }
   const folderCount = data?.policy?.policy?.roots?.filter(x => x.enabled)?.length ?? 0;
@@ -194,8 +231,17 @@ export default function SetupCenterPage() {
           </button>
         </div>
       </header>
-      {notice && <p role="status" className="rounded-lg border border-emerald-800 p-3 text-sm text-emerald-200">{notice}</p>}
-      {issue && <p role="alert" className="rounded-lg border border-amber-800 p-3 text-sm text-amber-200">{issue}</p>}
+      {notice && <p role={noticeTone === "warning" ? "alert" : "status"}
+        className={"rounded-lg border p-3 text-sm " +
+          (noticeTone === "warning"
+            ? "border-amber-800 bg-amber-950/20 text-amber-200"
+            : noticeTone === "delete"
+            ? "border-sky-800 bg-sky-950/20 text-sky-200"
+            : "border-emerald-800 bg-emerald-950/20 text-emerald-200")}>
+        <strong>{noticeTone === "warning" ? "Peringatan: " :
+          noticeTone === "delete" ? "Izin dicabut: " : "Berhasil: "}</strong>{notice}
+      </p>}
+      {issue && <p role="alert" className="rounded-lg border border-rose-800 bg-rose-950/20 p-3 text-sm text-rose-200">{issue}</p>}
       {data?.paired === true && <>
         <section className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-700 p-4">
@@ -265,11 +311,14 @@ export default function SetupCenterPage() {
                 <SystemCheckPanel system={system} busy={busy} onRefresh={() => void refresh()} />
               )}
               {activeStep === 1 && (
-                <FolderAccessPanel policyResponse={data?.policy} busy={busy}
-                  onAdd={payload => changeFolder("POST", payload, "Folder diberi izin baca")}
+                <FolderAccessPanel policyResponse={data?.policy}
+                  pendingDelete={data?.deleteApprovals?.pending} onApproveDelete={approvePendingDelete} busy={busy}
+                  onAdd={payload => changeFolder("POST", payload, "Izin folder berhasil ditambahkan")}
+                  onAccess={(id, access) => changeFolder("PATCH", rootAccessChange(id, access),
+                    access === "write" ? "Akses Read & Write diberikan" : "Akses diubah menjadi Read Only")}
                   onToggle={(id, enabled) => changeFolder("PATCH", rootEnabledChange(id, enabled),
                     enabled ? "Izin folder diaktifkan" : "Izin folder dinonaktifkan")}
-                  onRemove={id => changeFolder("DELETE", rootRemoval(id), "Izin folder dicabut")} />
+                  onRemove={id => changeFolder("DELETE", rootRemoval(id), "Akses MCP dicabut")} />
               )}
               {activeStep === 2 && (
                 <CredentialVaultPanel credentialInfo={data?.credentials} parentBusy={busy}

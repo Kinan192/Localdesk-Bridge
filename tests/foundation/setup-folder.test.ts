@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import {
-  newReadRoot, rootEnabledChange, rootRemoval,
+  newReadRoot, newFolderRoot, rootEnabledChange, rootAccessChange, rootRemoval,
 } from "../../src/features/setup-center/folder-policy.ts";
 
 test("foundation typecheck supports Next.js route imports and browser wizard helpers", async () => {
@@ -55,7 +55,7 @@ test("M2.2 root toggle and revoke payloads are strict and contain no access esca
   assert.throws(() => rootRemoval(""), /ID folder/);
 });
 
-test("M2.2 inline panels present actual system evidence and restrict folder UI to read-only", async () => {
+test("M3 inline panels expose explicit Read Only and Read & Write choices", async () => {
   const page = await fs.readFile("src/app/setup-center/page.js", "utf8");
   const components = await fs.readFile("src/features/setup-center/system-folder-panels.js", "utf8");
   const steps = await fs.readFile("src/features/setup-center/steps.js", "utf8");
@@ -68,11 +68,11 @@ test("M2.2 inline panels present actual system evidence and restrict folder UI t
   assert.match(page, /"X-Local-MCP-Action": "dashboard"/);
   assert.match(page, /data\?\.paired !== true/);
   assert.match(page, /policyMutationInFlight\.current/);
-  assert.match(page, /value\.mode !== "read-only"/);
-  assert.match(components, /policyResponse\?\.mode === "read-only"/);
+  assert.match(page, /\["read-only", "read-write"\]\.includes\(value\.mode\)/);
+  assert.match(components, /\["read-only", "read-write"\]\.includes/);
   assert.match(components, /const submitting = busy \|\| !available/);
-  assert.match(components, /root\.access !== "read"/);
-  assert.match(components, /Read &amp; Write belum tersedia/);
+  assert.match(components, /onAccess/);
+  assert.match(components, /Read &amp; Write/);
   assert.match(components, /window\.confirm\(/);
   assert.match(components, /File aslinya tidak akan dihapus/);
   assert.match(components, /system\.dependenciesReady/);
@@ -81,7 +81,21 @@ test("M2.2 inline panels present actual system evidence and restrict folder UI t
   assert.match(components, /<label htmlFor="setup-root-path"/);
   assert.match(components, /<form/);
   assert.match(steps, /id: "folders".*href: null/);
-  assert.doesNotMatch(components, /localStorage|sessionStorage|token=|access: "write"/);
+  assert.doesNotMatch(components, /localStorage|sessionStorage|token=/);
+});
+
+test("M3 folder dialog JSX closes correctly and notices distinguish delete, warning, success", async () => {
+  const dialog = await fs.readFile("src/components/layout/dashboard-dialogs.tsx", "utf8");
+  const setup = await fs.readFile("src/app/setup-center/page.js", "utf8");
+  assert.match(dialog, /\{folderError && <p[^>]*>\{folderError\}<\/p>\}/);
+  assert.match(setup, /const removingAccess = method === "DELETE"/);
+  assert.match(setup, /setNoticeTone\(removingAccess \? "delete" : reducingAccess \? "warning" : "success"\)/);
+  assert.match(setup, /Folder beserta file aslinya tetap ada di disk/);
+  assert.match(setup, /noticeTone === "delete"/);
+  assert.match(setup, /role=\{noticeTone === "warning" \? "alert" : "status"\}/);
+  // Refresh must not wipe an error message immediately after a failed mutation.
+  assert.match(setup, /if \(approved\) void refresh\(\)/);
+  assert.match(setup, /if \(changed\) void refresh\(\)/);
 });
 
 test("M2.2 policy mutations stay behind existing owner authorization and filesystem checks", async () => {
@@ -92,7 +106,7 @@ test("M2.2 policy mutations stay behind existing owner authorization and filesys
   assert.match(route, /await addReadOnlyRoot\(/);
   assert.match(route, /await setRootEnabled\(/);
   assert.match(route, /await removeRoot\(/);
-  assert.match(service, /access: "read"/);
+  assert.match(service, /access: data\.access/);
   assert.match(service, /NewRoot = z\.object\(/);
   assert.match(service, /\.strict\(\)/);
   assert.match(engine, /Overlapping roots are not supported/);

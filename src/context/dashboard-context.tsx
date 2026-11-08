@@ -58,6 +58,7 @@ function useDashboardState() {
   const [backendState, setBackendState] = useState<"loading" | "ready" | "error">("loading");
   const [backendError, setBackendError] = useState("");
   const [toast, setToast] = useState("");
+  const [toastTone, setToastTone] = useState<"success" | "warning" | "error">("success");
   const [folderModal, setFolderModal] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [folderPath, setFolderPath] = useState("");
@@ -109,7 +110,9 @@ function useDashboardState() {
     })));
     setTools(sampleTools.map(tool => ({
       ...tool,
-      enabled: tool.kind === "read" ? policy.tools[tool.id] === true : false,
+      // Display the actual server-authorized state for both Read and Write.
+      // Tool availability is enforced by the owner policy API and MCP server.
+      enabled: policy.tools[tool.id] === true,
     })));
     setBackendState("ready");
     setBackendError("");
@@ -128,14 +131,82 @@ function useDashboardState() {
     return () => { canceled = true; };
   }, []);
 
+  function normalizedFolderPath(value: string): string {
+    return value.trim().replace(/\/+$/, "") || "/";
+  }
+
+  function policyMatchesChange(policy: RemotePolicy, method: "POST" | "PATCH" | "DELETE",
+    body: Record<string, unknown>): boolean {
+    if (method === "PATCH" && body.type === "tool") {
+      return typeof body.tool === "string" &&
+        typeof body.enabled === "boolean" &&
+        policy.tools[body.tool] === body.enabled;
+    }
+    if (method === "PATCH" && body.type === "root") {
+      const root = policy.roots.find(item => item.id === body.id);
+      return !!root &&
+        (body.enabled === undefined || root.enabled === body.enabled) &&
+        (body.access === undefined || root.access === body.access);
+    }
+    if (method === "DELETE") return !policy.roots.some(item => item.id === body.id);
+    if (method === "POST") {
+      return typeof body.absolutePath === "string" &&
+        policy.roots.some(item =>
+          normalizedFolderPath(item.absolutePath) === normalizedFolderPath(body.absolutePath as string) &&
+          item.label === body.label &&
+          (body.access === undefined || item.access === body.access));
+    }
+    return false;
+  }
+
+  function policySuccessNotification(method: "POST" | "PATCH" | "DELETE",
+    body: Record<string, unknown>): { message: string; tone: "success" | "warning" } {
+    if (method === "DELETE") {
+      return { tone: "warning", message: "Akses folder dicabut dari MCP. Folder dan file asli di disk tidak dihapus." };
+    }
+    if (method === "POST") {
+      return { tone: "success", message: "Folder berhasil ditambahkan ke daftar akses MCP." };
+    }
+    if (body.type === "tool") {
+      return body.enabled
+        ? { tone: "success", message: "Tool " + String(body.tool) + " berhasil diaktifkan." }
+        : { tone: "warning", message: "Tool " + String(body.tool) + " dinonaktifkan." };
+    }
+    if (body.type === "root" && typeof body.enabled === "boolean" && body.enabled === false) {
+      return { tone: "warning", message: "Akses folder dinonaktifkan. File asli tetap ada." };
+    }
+    if (body.type === "root" && body.access === "read") {
+      return { tone: "warning", message: "Izin folder dibatasi menjadi Read Only." };
+    }
+    if (body.type === "root" && body.access === "write") {
+      return { tone: "success", message: "Izin folder berhasil diperbarui menjadi Read & Write." };
+    }
+    if (body.type === "root" && body.enabled === true) {
+      return { tone: "success", message: "Akses folder berhasil diaktifkan." };
+    }
+    return { tone: "success", message: "Perubahan izin berhasil disimpan." };
+  }
+
   async function changePolicy(method: "POST" | "PATCH" | "DELETE", body: Record<string, unknown>) {
     try {
-      const policy = await policyRequest(method, body);
-      applyPolicy(policy);
-      notify("Local policy saved. MCP changes take effect on the next client connection.");
+      const updated = await policyRequest(method, body);
+      if (!policyMatchesChange(updated, method, body)) {
+        throw new Error("Server merespons sukses, tetapi izin yang diminta tidak tersimpan.");
+      }
+      // Verify the value on disk using a fresh owner-protected GET. This also
+      // avoids displaying a success toast for a stale/inconsistent response.
+      const persisted = await policyRequest("GET");
+      applyPolicy(persisted);
+      if (!policyMatchesChange(persisted, method, body)) {
+        throw new Error("Status di server tidak sesuai setelah disimpan. Periksa proses LocalDesk yang aktif.");
+      }
+      const notice = policySuccessNotification(method, body);
+      notify(notice.message, notice.tone);
       return true;
     } catch (error) {
-      notify("Failed to save: " + (error instanceof Error ? error.message : "Unknown backend error"));
+      // Refresh the actual server state even if one request failed.
+      try { applyPolicy(await policyRequest("GET")); } catch { /* Keep last trusted state. */ }
+      notify("Gagal memperbarui izin: " + (error instanceof Error ? error.message : "Kesalahan backend."), "error");
       return false;
     }
   }
@@ -182,7 +253,10 @@ function useDashboardState() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const notify = (message: string) => setToast(message);
+  const notify = (message: string, tone: "success" | "warning" | "error" = "success") => {
+    setToastTone(tone);
+    setToast(message);
+  };
   const activeRoots = roots.filter(item => item.enabled).length;
   const activeTools = tools.filter(item => item.enabled).length;
   const canWrite = roots.filter(item => item.enabled && item.access === "write").length;
@@ -196,29 +270,34 @@ function useDashboardState() {
   }), [events, activityFilter, activityQuery]);
 
   const updateRoot = async (id: string, change: Partial<FolderRoot>) => {
-    if (backendState !== "ready") return notify("Backend not connected. Changes are disabled.");
-    if (change.access && change.access !== "read") return notify("Write access is not available in the read-only alpha.");
-    if (typeof change.enabled === "boolean") {
+    if (backendState !== "ready") return notify("Backend belum terhubung. Perubahan tidak dapat disimpan.", "error");
+    if (change.access === "read" || change.access === "write") {
+      await changePolicy("PATCH", { type: "root", id, access: change.access });
+    } else if (typeof change.enabled === "boolean") {
       await changePolicy("PATCH", { type: "root", id, enabled: change.enabled });
     }
   };
 
   const removeRoot = async (id: string) => {
-    if (backendState !== "ready") return notify("Backend not connected.");
-    if (!window.confirm("Revoke this folder from the local MCP allowlist?")) return;
+    if (backendState !== "ready") return notify("Backend belum terhubung.", "error");
+    const root = roots.find(item => item.id === id);
+    if (!root) return notify("Folder tidak ditemukan dalam daftar akses.", "error");
+    if (!window.confirm(
+      'Cabut akses MCP untuk "' + root.name + '"? Folder dan file asli di disk TIDAK akan dihapus.'
+    )) return;
     await changePolicy("DELETE", { id });
   };
 
   const updateTool = async (id: string, enabled: boolean) => {
-    if (backendState !== "ready") return notify("Backend not connected.");
+    if (backendState !== "ready") return notify("Backend belum terhubung.", "error");
     const tool = tools.find(item => item.id === id);
-    if (!tool || tool.kind !== "read") return notify("Write tools are disabled in this alpha.");
+    if (!tool) return notify("Tool tidak ditemukan.", "error");
     await changePolicy("PATCH", { type: "tool", tool: id, enabled });
   };
   const setPreference = (key: keyof Preferences, value: boolean) => setPrefs(current => ({ ...current, [key]: value }));
 
   async function restoreReadTools() {
-    if (backendState !== "ready") return notify("Backend not connected.");
+    if (backendState !== "ready") return notify("Backend belum terhubung.", "error");
     try {
       // Each update is validated again by the server.
       for (const tool of sampleTools.filter(item => item.kind === "read")) {
@@ -229,7 +308,7 @@ function useDashboardState() {
       }
       notify("All five read-only tools are now enabled.");
     } catch (error) {
-      notify("Could not restore tools: " + (error instanceof Error ? error.message : "Unknown error"));
+      notify("Gagal mengaktifkan tool Read: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui."), "error");
     }
   }
 
@@ -244,15 +323,40 @@ function useDashboardState() {
       setFolderError("Folder name and absolute path are required.");
       return;
     }
-    if (folderAccess !== "read") {
-      setFolderError("Only read-only roots can be added in this release.");
+    if (folderAccess === "write" && !window.confirm(
+      "Grant AI Read & Write permission for this folder? This includes creating and editing files."
+    )) return;
+    // Add Folder is also an explicit owner permission choice. If the folder
+    // already exists in the allowlist, update that exact entry instead of
+    // trying to POST a duplicate (which the server correctly rejects).
+    const normalize = (value: string) => value.trim().replace(/\/+$/, "") || "/";
+    let saved = false;
+    let reused = false;
+    try {
+      const current = await policyRequest("GET");
+      const existing = current.roots.find(root =>
+        normalize(root.absolutePath) === normalize(absolutePath));
+      if (existing) {
+        reused = true;
+        saved = existing.access === folderAccess && existing.enabled
+          ? true
+          : await changePolicy("PATCH", {
+              type: "root", id: existing.id, access: folderAccess, enabled: true,
+            });
+      } else {
+        saved = await changePolicy("POST", { label, absolutePath, access: folderAccess });
+      }
+    } catch (error) {
+      setFolderError(error instanceof Error ? error.message : "Cannot verify approved folders.");
       return;
     }
-    const saved = await changePolicy("POST", { label, absolutePath });
     if (!saved) {
-      setFolderError("Folder not saved. Check the notification for details.");
+      setFolderError(reused
+        ? "Could not update this folder's permission. Check the notification for details."
+        : "Folder not saved. Check the notification for details.");
       return;
     }
+    if (reused) notify("Folder sudah terdaftar. Izin folder tersebut sudah sesuai, tanpa membuat duplikat.", "warning");
     setFolderModal(false);
     setFolderName("");
     setFolderPath("");
@@ -269,7 +373,7 @@ function useDashboardState() {
 
   async function copyText(value: string, success: string) {
     try { await navigator.clipboard.writeText(value); notify(success); }
-    catch { notify("Clipboard permission denied. Copy directly from the page."); }
+    catch { notify("Izin clipboard ditolak. Salin teks secara manual.", "error"); }
   }
 
   function exportCsv() {
@@ -293,7 +397,7 @@ function useDashboardState() {
   }
 
 
-  return {page,setPage,mobileNav,setMobileNav,collapsed,setCollapsed,roots,setRoots,tools,setTools,events,setEvents,prefs,setPrefs,agentRunning,setAgentRunning,toast,setToast,folderModal,setFolderModal,folderName,setFolderName,folderPath,setFolderPath,folderAccess,setFolderAccess,folderError,setFolderError,guide,setGuide,welcome,setWelcome,welcomeStep,setWelcomeStep,onboardingOpen,setOnboardingOpen,toolQuery,setToolQuery,toolFilter,setToolFilter,activityQuery,setActivityQuery,activityFilter,setActivityFilter,openPage,notify,activeRoots,activeTools,canWrite,filteredTools,filteredEvents,updateRoot,removeRoot,updateTool,restoreReadTools,setPreference,addFolder,resetDemo,copyText,exportCsv,toggleAgentDemo,backendState,backendError,activityState,activityError,refreshActivity};
+  return {page,setPage,mobileNav,setMobileNav,collapsed,setCollapsed,roots,setRoots,tools,setTools,events,setEvents,prefs,setPrefs,agentRunning,setAgentRunning,toast,setToast,toastTone,folderModal,setFolderModal,folderName,setFolderName,folderPath,setFolderPath,folderAccess,setFolderAccess,folderError,setFolderError,guide,setGuide,welcome,setWelcome,welcomeStep,setWelcomeStep,onboardingOpen,setOnboardingOpen,toolQuery,setToolQuery,toolFilter,setToolFilter,activityQuery,setActivityQuery,activityFilter,setActivityFilter,openPage,notify,activeRoots,activeTools,canWrite,filteredTools,filteredEvents,updateRoot,removeRoot,updateTool,restoreReadTools,setPreference,addFolder,resetDemo,copyText,exportCsv,toggleAgentDemo,backendState,backendError,activityState,activityError,refreshActivity};
 }
 export type DashboardState = ReturnType<typeof useDashboardState>;
 const DashboardContext = createContext<DashboardState | null>(null);

@@ -27,7 +27,8 @@ const help = `LocalDesk — local-first MCP dashboard
 
 Usage:
   localdesk                    Start dashboard and configured MCP/Tunnel
-  localdesk --manual-services  Start dashboard without remote auto-start
+  localdesk --manual-services      Start dashboard without remote auto-start
+  localdesk --windows-write-preview  Windows: opt in to experimental file Write testing
   localdesk --help             Show this message
   localdesk --version          Show installed package version
 
@@ -51,7 +52,8 @@ if (argumentsList.length === 1 && ["--help", "-h"].includes(argumentsList[0])) {
     process.exitCode = 1;
   }
 } else if (argumentsList.length !== 0 &&
-  !(argumentsList.length === 1 && argumentsList[0] === "--manual-services")) {
+  !(argumentsList.length === 1 && argumentsList[0] === "--manual-services") &&
+  !(argumentsList.length === 1 && argumentsList[0] === "--windows-write-preview" && process.platform === "win32")) {
   process.stderr.write("Unknown LocalDesk option. Use 'localdesk --help'.\n");
   process.exitCode = 2;
 } else {
@@ -74,6 +76,10 @@ if (argumentsList.length === 1 && ["--help", "-h"].includes(argumentsList[0])) {
       ...(argumentsList[0] === "--manual-services" ? ["--manual-services"] : []),
     ], {
       cwd: projectRoot, shell: false, stdio: "inherit", windowsHide: true,
+      env: { ...process.env,
+        ...(argumentsList[0] === "--windows-write-preview"
+          ? { LOCALDESK_WINDOWS_WRITE_EXPERIMENTAL: "1" } : {}),
+      },
     });
     let requestedStop = false;
     let spawnError = false;

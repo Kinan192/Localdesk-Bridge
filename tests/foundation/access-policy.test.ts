@@ -48,7 +48,7 @@ test("Overlapping or symlink roots are rejected, even if one is disabled", async
     p.roots = [p.roots[0], { ...p.roots[0], id: "parent" }];
     await assert.rejects(PolicyEngine.create(p), /duplicate/i);
     const linked = path.join(dir, "symlink");
-    await fs.symlink(nested, linked);
+    await fs.symlink(nested, linked, process.platform === "win32" ? "junction" : "dir");
     p.roots = [{ id: "symlink", label: "Symlink", absolutePath: linked, enabled: true, access: "read" }];
     await assert.rejects(PolicyEngine.create(p), /symlink/i);
   } finally { await fs.rm(dir, { recursive: true, force: true }); }

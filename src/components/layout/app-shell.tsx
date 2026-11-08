@@ -1,13 +1,13 @@
 "use client";
 import type { ReactNode } from "react";
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Command, Menu, Monitor, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Command, Menu, Monitor, ShieldCheck, X, XCircle } from "lucide-react";
 import { menu, pageInfo } from "@/config/navigation";
 import { useDashboard } from "@/context/dashboard-context";
 import { Tag } from "@/components/ui";
 
 // Shared chrome; pages and dialogs are injected as children.
 export default function AppShell({ children }: { children: ReactNode }) {
-  const { collapsed, prefs, mobileNav, setMobileNav, setCollapsed, page, openPage, setWelcome, toast, setToast, backendState } = useDashboard();
+  const { collapsed, prefs, mobileNav, setMobileNav, setCollapsed, page, openPage, setWelcome, toast, toastTone, setToast, backendState } = useDashboard();
   return <div className={"app-shell flex min-h-screen bg-canvas text-slate-100" + (collapsed ? " nav-collapsed" : "") + (prefs.compact ? " compact-layout" : "")}>
     {mobileNav && <button className="mobile-shade" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <aside className={"app-sidebar sticky top-0 z-30 hidden h-screen w-[252px] shrink-0 flex-col border-r border-slate-700/60 bg-[#0d141d] p-4 lg:flex" + (mobileNav ? " mobile-open" : "")}>
@@ -24,7 +24,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <footer className="app-footer flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 px-5 py-5 text-[10px] text-slate-500 lg:px-10"><span>Local MCP Manager · Read-only alpha v0.3</span><span><ShieldCheck size={13} /> Policy {backendState === "ready" ? "available" : "unavailable"} · Agent not supervised</span></footer>
     </div>
 
-    {toast && <div className="toast" role="status"><CheckCircle2 size={19} /> <span>{toast}</span><button aria-label="Dismiss" onClick={() => setToast("")}><X size={15} /></button></div>}
+    {toast && <div
+      className={"toast " + (toastTone === "error" ? "toast-error" : toastTone === "warning" ? "toast-warning" : "toast-success")}
+      role={toastTone === "error" ? "alert" : "status"}
+      aria-live={toastTone === "error" ? "assertive" : "polite"}>
+      {toastTone === "error" ? <XCircle size={19} /> :
+       toastTone === "warning" ? <AlertTriangle size={19} /> : <CheckCircle2 size={19} />}
+      <span>{toast}</span>
+      <button aria-label="Dismiss notification" onClick={() => setToast("")}><X size={15} /></button>
+    </div>}
 
 
   </div>;

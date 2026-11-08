@@ -62,6 +62,7 @@ export function runtimeEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv
     "TMP", "TEMP", "TMPDIR", "LANG", "LC_ALL",
     "LOCAL_MCP_STATE_DIR", "CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_AUD",
     "MCP_PUBLIC_HOSTNAME", "MCP_HTTP_PORT",
+    "LOCALDESK_WINDOWS_WRITE_EXPERIMENTAL",
   ] as const;
   const selected: NodeJS.ProcessEnv = { NODE_ENV: source.NODE_ENV ?? "production" };
   for (const key of allowlist) if (source[key] !== undefined) selected[key] = source[key];

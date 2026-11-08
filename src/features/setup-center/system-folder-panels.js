@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { newReadRoot } from "./folder-policy";
+import { newFolderRoot } from "./folder-policy";
 
 const rowClass = "rounded-lg border border-slate-700 bg-slate-950/40 p-3";
 const inputClass = "w-full min-w-0 rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50";
@@ -60,12 +60,15 @@ export function SystemCheckPanel({ system, busy, onRefresh }) {
   );
 }
 
-export function FolderAccessPanel({ policyResponse, busy, onAdd, onToggle, onRemove }) {
+export function FolderAccessPanel({ policyResponse, busy, onAdd, onToggle, onRemove, onAccess, pendingDelete, onApproveDelete }) {
   const [label, setLabel] = useState("");
   const [absolutePath, setAbsolutePath] = useState("");
+  const [access, setAccess] = useState("read");
   const [formError, setFormError] = useState("");
 
-  const policy = policyResponse?.mode === "read-only" ? policyResponse.policy : null;
+  const policy = ["read-only", "read-write"].includes(policyResponse?.mode)
+    ? policyResponse.policy : null;
+  const writeSupported = policyResponse?.writeRelease?.available === true;
   const roots = Array.isArray(policy?.roots) ? policy.roots : null;
   const available = roots !== null;
   const submitting = busy || !available;
@@ -75,10 +78,12 @@ export function FolderAccessPanel({ policyResponse, busy, onAdd, onToggle, onRem
     if (submitting) return;
     setFormError("");
     try {
-      const payload = newReadRoot(label, absolutePath);
+      if (access === "write" && !window.confirm("Berikan AI izin membuat, mengedit, mengganti nama, dan meminta penghapusan file pada folder ini?")) return;
+      const payload = newFolderRoot(label, absolutePath, access);
       if (await onAdd(payload)) {
         setLabel("");
         setAbsolutePath("");
+        setAccess("read");
       }
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Input folder tidak valid.");
@@ -92,14 +97,35 @@ export function FolderAccessPanel({ policyResponse, busy, onAdd, onToggle, onRem
   }
 
   return (
-    <section className="space-y-4" aria-label="Izin folder baca">
+    <section className="space-y-4" aria-label="Izin akses folder">
       <p className="text-sm text-slate-300">
-        Pilih hanya folder yang diperlukan. Izin saat ini <strong>Read Only</strong>; Read &amp; Write belum tersedia dan tidak dapat diaktifkan dari wizard.
+        Pilih folder dan tentukan izin <strong>Read Only</strong> atau <strong>Read &amp; Write</strong>. Izin awal selalu Read Only; Write harus dipilih secara eksplisit.
       </p>
       {policyResponse?.writeRelease?.available === false && (
         <p role="status" className="rounded-lg border border-slate-700 p-3 text-xs leading-5 text-amber-200">
-          Mode Write masih dikunci oleh pemeriksaan keamanan M3. Perlindungan filesystem, otorisasi per klien, konfirmasi penghapusan, dan pengujian lintas platform harus selesai sebelum Write dapat diaktifkan.
+          Write hanya tersedia dengan sandbox Linux atau pada mode pengujian Windows (localdesk --windows-write-preview). Mode Windows belum setara isolasi sandbox Linux: gunakan folder khusus tanpa data sensitif. Penghapusan file selalu memerlukan persetujuan terpisah.
         </p>
+      )}
+
+      {Array.isArray(pendingDelete) && pendingDelete.length > 0 && (
+        <div className={rowClass}>
+          <h4 className="font-medium">Persetujuan penghapusan dari AI</h4>
+          <p className="mt-1 text-xs text-amber-200">Periksa nama folder dan file sebelum menyetujui. Izin ini hanya berlaku sekali.</p>
+          <ul className="mt-3 space-y-2">
+            {pendingDelete.map(item => (
+              <li key={item.id} className="rounded border border-slate-700 p-3">
+                <p className="break-all text-sm">{item.file}</p>
+                <p className="text-xs text-slate-400">Folder ID: {item.rootId}</p>
+                <button className={buttonClass + " mt-2"} type="button" disabled={busy}
+                  onClick={() => {
+                    const root = roots?.find(r => r.id === item.rootId);
+                    if (!root || !window.confirm("Setujui AI menghapus file '" + item.file + "' dalam folder '" + root.label + "'?")) return;
+                    void onApproveDelete(item.id);
+                  }}>Setujui hapus sekali</button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <div className={rowClass}>
@@ -121,12 +147,23 @@ export function FolderAccessPanel({ policyResponse, busy, onAdd, onToggle, onRem
                     <p className="font-medium break-words">{root.label}</p>
                     <p className="mt-1 break-all font-mono text-xs text-slate-400">{root.absolutePath}</p>
                     <p className="mt-2 text-xs text-slate-400">
-                      {root.access === "read" ? "Read Only" : "Izin tidak dikenal — perlu pemeriksaan"} · {root.enabled ? "Aktif" : "Nonaktif"}
+                      {root.access === "write" ? "Read & Write" : "Read Only"} · {root.enabled ? "Aktif" : "Nonaktif"}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-xs text-slate-400" htmlFor={"root-access-" + root.id}>Akses</label>
+                    <select id={"root-access-" + root.id} className={inputClass}
+                      value={root.access} disabled={submitting || (!writeSupported && root.access === "read")}
+                      onChange={event => {
+                        const selected = event.target.value;
+                        if (selected === "write" && !window.confirm("Izinkan AI membuat dan mengubah file di folder '" + root.label + "'?")) return;
+                        void onAccess(root.id, selected);
+                      }}>
+                      <option value="read">Read Only</option>
+                      <option value="write" disabled={!writeSupported}>Read & Write</option>
+                    </select>
                     <button type="button" className={buttonClass}
-                      disabled={submitting || root.access !== "read"}
+                      disabled={submitting}
                       onClick={() => void onToggle(root.id, !root.enabled)}>
                       {root.enabled ? "Nonaktifkan" : "Aktifkan"}
                     </button>
@@ -141,7 +178,7 @@ export function FolderAccessPanel({ policyResponse, busy, onAdd, onToggle, onRem
       </div>
 
       <form className={rowClass + " space-y-3"} onSubmit={submit}>
-        <h4 className="font-medium">Tambahkan folder — Read Only</h4>
+        <h4 className="font-medium">Tambahkan folder</h4>
         <div>
           <label htmlFor="setup-root-label" className="mb-1 block text-sm text-slate-300">Nama folder</label>
           <input id="setup-root-label" className={inputClass} type="text" maxLength={80}
@@ -155,11 +192,20 @@ export function FolderAccessPanel({ policyResponse, busy, onAdd, onToggle, onRem
             onChange={event => setAbsolutePath(event.target.value)}
             placeholder="/home/username/Projects/contoh" disabled={submitting} />
         </div>
+        <div>
+          <label htmlFor="setup-root-access" className="mb-1 block text-sm text-slate-300">Izin akses</label>
+          <select id="setup-root-access" className={inputClass} value={access}
+            onChange={event => setAccess(event.target.value)} disabled={submitting}>
+            <option value="read">Read Only</option>
+            <option value="write" disabled={!writeSupported}>Read & Write</option>
+          </select>
+          {!writeSupported && <p className="mt-1 text-xs text-amber-200">Write belum tersedia pada sistem ini.</p>}
+        </div>
         <p className="text-xs text-slate-400">
           Folder harus sudah ada dan menggunakan path absolut. Validasi keamanan dilakukan kembali oleh server; seluruh home, folder tersembunyi, symlink dan folder yang saling bertumpuk ditolak.
         </p>
         {formError && <p role="alert" className="text-sm text-amber-200">{formError}</p>}
-        <button className={buttonClass} type="submit" disabled={submitting}>Berikan akses baca</button>
+        <button className={buttonClass} type="submit" disabled={submitting || (access === "write" && !writeSupported)}>Simpan izin folder</button>
       </form>
     </section>
   );

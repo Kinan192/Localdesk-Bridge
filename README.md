@@ -16,7 +16,7 @@
 - After successful owner pairing, production `npm start` attempts to start the already-configured protected MCP listener and dedicated Tunnel in that order. `npm run start:manual` disables this convenience. No cloud resources are provisioned, and service failure does not bypass security.
 - Start/Stop controls manage only processes started by this dashboard, not pre-existing cloudflared or system services.
 
-**Not implemented or not verified for release:** remote file Write, clean-install browser E2E, full TSX UI cleanup, signed native installers, Windows/macOS production QA. A healthy Tunnel or a 401 from the remote MCP listener is **not** proof that ChatGPT or Claude can call tools.
+**Not implemented or not verified for stable release:** Windows remote file Write security equivalence (preview only; explicit opt-in required), clean-install browser E2E, full TSX UI cleanup, signed native installers, Windows/macOS production QA. A healthy Tunnel or a 401 from the remote MCP listener is **not** proof that ChatGPT or Claude can call tools.
 
 ## Install and start (source install)
 
@@ -61,8 +61,8 @@ Open `http://127.0.0.1:3100/setup-center`. Follow the steps and verify `list_roo
 - Pairing tickets are one use, expire quickly and are delivered in a URL fragment; owner browser sessions expire.
 - The launcher checks the HTTP listener's identity using a per-start HMAC challenge before creating the ticket.
 - Remote MCP is loopback-only behind Cloudflare Tunnel, Cloudflare Access and JWT verification. **Never point Tunnel ingress to dashboard port 3100.**
-- Default folder permissions are empty and read-only. Write tools are **not registered** in remote MCP; client requests cannot enable them through the policy API.
-- `FileEngine` path validation is not sufficient to eliminate parent-symlink TOCTOU for mutations; remote Write is deliberately blocked pending secure, OS-aware containment, adversarial tests and explicit local approvals.
+- Default folder permissions are empty and Read Only. Remote Write tools are only registered when a platform write worker passes its capability check; enabling a tool or approved Write root requires a local owner action. Windows Write additionally requires an explicit preview flag.
+- Linux Write uses bubblewrap filesystem isolation. The Windows worker currently uses path validation plus a separate same-user process, **not** OS-enforced isolation; it cannot guarantee prevention of hostile concurrent directory-swapping races and must not be described as production-secure.
 - No cloud credentials, Tunnel connector token or owner ticket should ever be committed to Git.
 
 ## Verification before publishing

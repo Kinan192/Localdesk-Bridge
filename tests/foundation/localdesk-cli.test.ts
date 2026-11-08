@@ -31,6 +31,7 @@ test("localdesk --help works outside project root without starting or pairing", 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Usage:/);
   assert.match(result.stdout, /localdesk --manual-services/);
+  assert.match(result.stdout, /localdesk --windows-write-preview/);
   assert.doesNotMatch(result.stdout, /#owner-pair=/);
 });
 

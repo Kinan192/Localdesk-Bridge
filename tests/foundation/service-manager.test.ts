@@ -62,12 +62,14 @@ test("Service process environment drops unexpected secrets and command injection
     HOME: "/tmp", LOCAL_MCP_STATE_DIR: "/tmp/state",
     CF_ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com",
     CF_ACCESS_AUD: "some-audience",
+    LOCALDESK_WINDOWS_WRITE_EXPERIMENTAL: "1",
     NODE_OPTIONS: "--require malicious-script",
     CLOUDFLARE_API_TOKEN: "secret", OTHER_APP_PRIVATE_KEY: "secret",
   });
   assert.equal(environment.PATH, "/bin");
   assert.equal(environment.LOCAL_MCP_STATE_DIR, "/tmp/state");
   assert.equal(environment.CF_ACCESS_AUD, "some-audience");
+  assert.equal(environment.LOCALDESK_WINDOWS_WRITE_EXPERIMENTAL, "1");
   assert.equal(environment.NODE_OPTIONS, undefined);
   assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
   assert.equal(environment.OTHER_APP_PRIVATE_KEY, undefined);

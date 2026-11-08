@@ -93,6 +93,7 @@ test("M2.7 missing backend, Cloudflare, Keychain or manual Tunnel is fail closed
 test("M2.7 all existing mutation APIs still require owner + CSRF protection", async () => {
   const protectedRoutes = [
     "src/app/api/local/policy/route.ts",
+    "src/app/api/local/delete-approvals/route.ts",
     "src/app/api/local/cloudflare/credentials/route.ts",
     "src/app/api/local/cloudflare/deployment/route.ts",
     "src/app/api/local/cloudflare/dns-finalize/route.ts",

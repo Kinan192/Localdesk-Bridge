@@ -48,7 +48,7 @@ async function validateRoot(root) {
   // Only normal local drive paths are supported. Reject UNC and device paths.
   if (!/^[a-z]:\\/i.test(normalized) || same(normalized, path.win32.parse(normalized).root)) deny();
   const info = await fs.lstat(normalized);
-  if (!info.isDirectory() || info.isSymbolicLink() || !Number.isSafeInteger(info.ino) || info.ino === 0) deny();
+  if (!info.isDirectory() || info.isSymbolicLink()) deny();
   const real = await fs.realpath(normalized);
   if (!same(real, normalized)) deny();
   return { root: normalized, info };
@@ -71,7 +71,6 @@ async function locate(root, relative, allowMissing = false) {
       throw error;
     }
     if (st.isSymbolicLink() || (!last && !st.isDirectory()) || (st.isFile() && st.nlink !== 1)) deny();
-    if (!Number.isSafeInteger(st.ino) || st.ino === 0) deny();
     const real = await fs.realpath(here);
     if (!inside(root, real) || !same(real, here)) deny();
   }
@@ -91,8 +90,7 @@ async function regularFile(root, name, withContent = false) {
     const named = await fs.lstat(file);
     // Detect a substituted junction/link between path validation and open.
     if (!st.isFile() || st.nlink !== 1 || st.size > MAX_BYTES ||
-        named.isSymbolicLink() || st.ino !== named.ino || st.dev !== named.dev ||
-        !Number.isSafeInteger(st.ino) || st.ino === 0) deny();
+        named.isSymbolicLink() || st.ino !== named.ino || st.dev !== named.dev) deny();
     const content = withContent ? await handle.readFile() : null;
     const after = await handle.stat();
     if (fingerprint(after) !== fingerprint(st) || (content && content.length > MAX_BYTES)) deny();

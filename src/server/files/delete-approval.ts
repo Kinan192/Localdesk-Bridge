@@ -89,22 +89,33 @@ export async function approveDelete(id:string):Promise<void> {
 export async function consumeDelete(rootId:string,file:string,id:string):Promise<void> {
   const folder=await directory();
   const location=fileOf(folder,id);
-  // Atomically move the ticket out of its claimable name BEFORE reading.
-  // Two simultaneous remote calls must never be able to spend one approval
-  // twice. Invalid or expired claims are consumed as well (fail closed).
-  const claimed=path.join(folder,"spent-"+randomUUID()+".tmp");
+  // An exclusive per-ticket claim makes Windows consume atomic, too.
+  // Concurrent fs.rename calls are not a reliable single-consumer guard.
+  const lockFile = path.join(folder, "claim-" + id + ".lock");
+  let lock: Awaited<ReturnType<typeof fs.open>>;
   try {
-    await fs.rename(location,claimed);
+    lock = await fs.open(lockFile, "wx", 0o600);
   } catch {
-    throw new FoundationError("ACCESS_DENIED","Local owner approval required for this exact deletion.");
+    throw new FoundationError("ACCESS_DENIED", "Local owner approval required for this exact deletion.");
   }
   try {
-    const ticket=await readTicket(claimed);
-    if(!ticket || ticket.id!==id || ticket.rootId!==rootId || ticket.file!==file ||
-        !ticket.approved || ticket.expiresAt<=Date.now()) {
-      throw new FoundationError("ACCESS_DENIED","Local owner approval required for this exact deletion.");
+    const claimed = path.join(folder, "spent-" + randomUUID() + ".tmp");
+    try {
+      await fs.rename(location, claimed);
+    } catch {
+      throw new FoundationError("ACCESS_DENIED", "Local owner approval required for this exact deletion.");
+    }
+    try {
+      const ticket = await readTicket(claimed);
+      if (!ticket || ticket.id !== id || ticket.rootId !== rootId || ticket.file !== file ||
+          !ticket.approved || ticket.expiresAt <= Date.now()) {
+        throw new FoundationError("ACCESS_DENIED", "Local owner approval required for this exact deletion.");
+      }
+    } finally {
+      await fs.unlink(claimed).catch(() => {});
     }
   } finally {
-    await fs.unlink(claimed).catch(() => {});
+    await lock.close();
+    await fs.unlink(lockFile).catch(() => {});
   }
 }

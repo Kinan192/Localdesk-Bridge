@@ -102,6 +102,8 @@ test("M3 delete approval is atomic when simultaneous requests replay one ticket"
     assert.equal(results.filter(value => value.status === "rejected").length, 11);
     await assert.rejects(consumeDelete("root", "docs/single.txt", ticket.approvalId),
       /approval required/i);
+    assert.equal((await fs.readdir(path.join(base, "pending-delete")))
+      .some(name => name.endsWith(".lock")), false, "Claim lock must be released");
   } finally {
     if (previous === undefined) delete process.env.LOCAL_MCP_STATE_DIR;
     else process.env.LOCAL_MCP_STATE_DIR = previous;

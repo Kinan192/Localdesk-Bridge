@@ -213,7 +213,12 @@ if (process.argv[2] === "--probe") {
   try {
     await probe();
     process.stdout.write(JSON.stringify({ ok: true }));
-  } catch {
+  } catch (error) {
+    // Local preview diagnostics; remote operation errors stay generic.
+    if (process.env.LOCALDESK_WINDOWS_WRITE_EXPERIMENTAL === "1") {
+      process.stderr.write("[Localdesk] Windows probe error: " +
+        (error instanceof Error ? error.stack : String(error)) + "\n");
+    }
     process.exitCode = 1;
   }
 } else {

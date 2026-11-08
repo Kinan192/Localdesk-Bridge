@@ -25,15 +25,30 @@ export function writeBackendAvailable(): boolean {
   if (process.platform === "win32") {
     if (process.env.LOCALDESK_WINDOWS_WRITE_EXPERIMENTAL !== "1") return false;
     // Fail closed when the separate Windows worker cannot actually start.
-    // The probe exercises temporary real writes; cache it for this process
-    // instead of creating files during every remote MCP tool registration.
-    if (windowsWorkerProbe !== null) return windowsWorkerProbe;
-    const probe = spawnSync(process.execPath, [windowsRunner, "--probe"], {
-      timeout: 15000, windowsHide: true, encoding: "utf8",
-    });
-    windowsWorkerProbe = !probe.error && probe.status === 0 &&
-      probe.stdout?.trim() === '{"ok":true}';
-    return windowsWorkerProbe;
+    // The test runner can inject NODE_TEST_CONTEXT into child processes.
+    // Cache success only: a transient probe failure must not poison the process.
+    if (windowsWorkerProbe === true) return true;
+    const workerEnv = { ...process.env };
+    for (const key of ["NODE_TEST_CONTEXT", "NODE_TEST_WORKER_ID",
+      "NODE_CHANNEL_FD", "NODE_CHANNEL_SERIALIZATION_MODE", "NODE_OPTIONS"]) {
+      delete workerEnv[key];
+    }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const probe = spawnSync(process.execPath, [windowsRunner, "--probe"], {
+        timeout: 15000, windowsHide: true, encoding: "utf8", env: workerEnv,
+      });
+      if (!probe.error && probe.status === 0 &&
+          probe.stdout?.trim() === '{"ok":true}') {
+        windowsWorkerProbe = true;
+        return true;
+      }
+      if (process.env.LOCALDESK_WINDOWS_WRITE_EXPERIMENTAL === "1") {
+        const reason = probe.error?.message || probe.stderr?.trim() ||
+          `exit=${probe.status ?? "null"}, stdout=${probe.stdout?.trim() || "empty"}`;
+        console.error(`[Localdesk] Windows Write probe attempt ${attempt + 1} failed: ${reason.slice(0, 400)}`);
+      }
+    }
+    return false;
   }
   if (process.platform !== "linux") return false;
   // A version check alone is insufficient: user namespaces can be blocked.
